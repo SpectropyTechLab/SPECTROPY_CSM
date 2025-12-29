@@ -1,139 +1,104 @@
-import { Sidebar } from "@/components/layout/Sidebar";
-import { StatCard } from "@/components/ui/StatCard";
-import { Activity, Briefcase, CheckCircle2, Clock } from "lucide-react";
-import { useProjects } from "@/hooks/use-projects";
-import { useTasks } from "@/hooks/use-tasks";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { motion } from "framer-motion";
+import React from "react";
 
-export default function Dashboard() {
-  const { data: projects, isLoading: projectsLoading } = useProjects();
-  const { data: tasks, isLoading: tasksLoading } = useTasks();
+// 💾 Mock Data (can be replaced with API)
+const mockDashboardData = {
+  stats: {
+    projectCount: 12,
+    taskCount: 48,
+    overdueCount: 7,
+  },
+  projects: [
+    { id: 101, name: "RA Portal", status: "In Progress", owner: "Kiran" },
+    { id: 102, name: "SCORM Setup", status: "Planning", owner: "Neha" },
+  ],
+  contributors: [
+    { name: "Ravi", minutes: 320 },
+    { name: "Sneha", minutes: 275 },
+  ],
+  totalMinutesToday: 185,
+  goal: 240,
+  notifications: [
+    { id: 1, text: "Task 'UI Fixes' assigned to Rakesh", time: "10m ago" },
+    { id: 2, text: "Project 'LMS Module' marked completed", time: "2h ago" },
+  ],
+};
 
-  const totalProjects = projects?.length || 0;
-  const activeProjects = projects?.filter(p => p.status === 'active').length || 0;
-  const completedTasks = tasks?.filter(t => t.status === 'done').length || 0;
-  const pendingTasks = tasks?.filter(t => t.status === 'todo' || t.status === 'in_progress').length || 0;
-
-  const chartData = [
-    { name: 'Mon', tasks: 4 },
-    { name: 'Tue', tasks: 7 },
-    { name: 'Wed', tasks: 5 },
-    { name: 'Thu', tasks: 12 },
-    { name: 'Fri', tasks: 8 },
-    { name: 'Sat', tasks: 3 },
-    { name: 'Sun', tasks: 2 },
-  ];
+const Dashboard = () => {
+  const { stats, projects, contributors, totalMinutesToday, goal, notifications } = mockDashboardData;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 md:ml-64 p-8 overflow-y-auto">
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-display font-bold text-white mb-1">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back, here's what's happening today.</p>
-          </div>
-          <div className="flex gap-4">
-             {/* Date picker or user avatar could go here */}
-             <div className="w-10 h-10 rounded-full bg-gradient-to-r from-primary to-accent p-[2px]">
-                <div className="w-full h-full rounded-full bg-card flex items-center justify-center font-bold text-sm">
-                  JD
-                </div>
-             </div>
-          </div>
-        </header>
+    <div className="min-h-screen bg-background text-white p-6 space-y-6">
+      {/* Heading */}
+      <h1 className="text-3xl font-bold tracking-wide text-primary animate-fade">
+        📊 Dashboard Overview
+      </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <StatCard 
-              label="Total Projects" 
-              value={projectsLoading ? "..." : totalProjects} 
-              icon={Briefcase} 
-              trend="+12%" 
-              trendUp={true}
-              color="primary"
-            />
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <StatCard 
-              label="Active Tasks" 
-              value={tasksLoading ? "..." : pendingTasks} 
-              icon={Activity} 
-              trend="-5%" 
-              trendUp={false}
-              color="accent"
-            />
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <StatCard 
-              label="Completed" 
-              value={tasksLoading ? "..." : completedTasks} 
-              icon={CheckCircle2} 
-              trend="+24%" 
-              trendUp={true}
-              color="purple"
-            />
-          </motion.div>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-            <StatCard 
-              label="Efficiency" 
-              value="94%" 
-              icon={Clock} 
-              trend="+2%" 
-              trendUp={true}
-              color="orange"
-            />
-          </motion.div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade">
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl text-center border border-slate-700">
+          <h2 className="text-lg font-semibold text-accent">Projects</h2>
+          <p className="text-2xl font-bold">{stats.projectCount}</p>
+        </div>
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl text-center border border-slate-700">
+          <h2 className="text-lg font-semibold text-accent">Tasks</h2>
+          <p className="text-2xl font-bold">{stats.taskCount}</p>
+        </div>
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl text-center border border-slate-700">
+          <h2 className="text-lg font-semibold text-accent">Overdue</h2>
+          <p className="text-2xl font-bold text-red-400">{stats.overdueCount}</p>
+        </div>
+      </div>
+
+      {/* Project List + Time Tracker */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl border border-slate-700 animate-fade">
+          <h3 className="text-xl font-semibold mb-2 text-primary">🗂 Latest Projects</h3>
+          <ul className="space-y-2">
+            {projects.map(p => (
+              <li key={p.id} className="border-b border-slate-600 pb-1">
+                <span className="font-medium">{p.name}</span> — <span className="text-sm">{p.status}</span> ({p.owner})
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 glass-panel rounded-2xl p-6">
-            <h3 className="text-xl font-display font-bold text-white mb-6">Weekly Activity</h3>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
-                  />
-                  <Bar dataKey="tasks" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 4 ? '#22d3ee' : '#4f46e5'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-2xl p-6">
-            <h3 className="text-xl font-display font-bold text-white mb-6">Recent Projects</h3>
-            <div className="space-y-4">
-              {projectsLoading ? (
-                <div className="text-muted-foreground text-sm">Loading projects...</div>
-              ) : activeProjects === 0 ? (
-                <div className="text-muted-foreground text-sm">No active projects.</div>
-              ) : (
-                projects?.slice(0, 4).map((project) => (
-                  <div key={project.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
-                    <div>
-                      <h4 className="font-semibold text-white text-sm group-hover:text-primary transition-colors">{project.name}</h4>
-                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">{project.description || 'No description'}</p>
-                    </div>
-                    <div className="text-xs px-2 py-1 rounded-full bg-primary/20 text-primary-foreground">
-                      {project.status}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl border border-slate-700 animate-fade">
+          <h3 className="text-xl font-semibold mb-2 text-primary">⏱ Time Tracker</h3>
+          <p className="text-lg">Today's Time: <span className="text-accent">{totalMinutesToday} min</span></p>
+          <p className="text-sm">Goal: {goal} min</p>
+          <div className="w-full bg-slate-700 rounded-full h-2.5 mt-2">
+            <div 
+              className="bg-accent h-2.5 rounded-full" 
+              style={{ width: `${Math.min((totalMinutesToday / goal) * 100, 100)}%` }}
+            ></div>
           </div>
         </div>
-      </main>
+      </div>
+
+      {/* Contributors + Notifications */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl border border-slate-700 animate-fade">
+          <h3 className="text-xl font-semibold mb-2 text-primary">🏅 Top Contributors</h3>
+          <ol className="space-y-1 list-decimal list-inside">
+            {contributors.map(c => (
+              <li key={c.name} className="text-slate-200">
+                <span className="font-medium text-white">{c.name}</span> – {c.minutes} min
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <div className="bg-slate-800 p-4 rounded-2xl shadow-xl border border-slate-700 animate-fade">
+          <h3 className="text-xl font-semibold mb-2 text-primary">🔔 Notifications</h3>
+          <ul className="space-y-1 text-sm">
+            {notifications.map(n => (
+              <li key={n.id} className="text-slate-300">• {n.text} <span className="text-slate-400 italic">({n.time})</span></li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Dashboard;
