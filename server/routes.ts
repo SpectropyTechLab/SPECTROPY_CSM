@@ -4,14 +4,32 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 
+const otpMap = new Map<string, { code: string; expires: number; verified: boolean }>();
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 async function seedDatabase() {
   const users = await storage.getUsers();
   if (users.length === 0) {
     const user = await storage.createUser({
       username: "admin",
+      email: "admin@spectropy.com",
+      password: "admin123",
       name: "Admin User",
       title: "Project Manager",
-      avatar: "https://github.com/shadcn.png"
+      avatar: "https://github.com/shadcn.png",
+      role: "Admin",
+    });
+
+    await storage.createUser({
+      username: "user",
+      email: "user@spectropy.com",
+      password: "user123",
+      name: "Standard User",
+      title: "Developer",
+      role: "User",
     });
 
     const project = await storage.createProject({
@@ -19,6 +37,25 @@ async function seedDatabase() {
       description: "Redesigning the corporate website for better UX.",
       status: "active",
       startDate: new Date(),
+      ownerId: user.id,
+    });
+
+    const bucket1 = await storage.createBucket({
+      title: "To Do",
+      projectId: project.id,
+      position: 0,
+    });
+
+    const bucket2 = await storage.createBucket({
+      title: "In Progress",
+      projectId: project.id,
+      position: 1,
+    });
+
+    const bucket3 = await storage.createBucket({
+      title: "Done",
+      projectId: project.id,
+      position: 2,
     });
 
     await storage.createTask({
@@ -27,8 +64,11 @@ async function seedDatabase() {
       status: "in_progress",
       priority: "high",
       projectId: project.id,
+      bucketId: bucket2.id,
       assigneeId: user.id,
-      dueDate: new Date(Date.now() + 86400000 * 3), // 3 days
+      dueDate: new Date(Date.now() + 86400000 * 3),
+      position: 0,
+      history: [`Created on ${new Date().toLocaleDateString()}`],
     });
 
     await storage.createTask({
@@ -37,6 +77,9 @@ async function seedDatabase() {
       status: "todo",
       priority: "medium",
       projectId: project.id,
+      bucketId: bucket1.id,
+      position: 0,
+      history: [`Created on ${new Date().toLocaleDateString()}`],
     });
   }
 }
@@ -130,6 +173,142 @@ export async function registerRoutes(
   app.get(api.users.list.path, async (req, res) => {
     const users = await storage.getUsers();
     res.json(users);
+  });
+
+  // Buckets
+  app.get(api.buckets.list.path, async (req, res) => {
+    const projectId = Number(req.query.projectId);
+    if (!projectId) return res.status(400).json({ message: "projectId is required" });
+    const buckets = await storage.getBuckets(projectId);
+    res.json(buckets);
+  });
+
+  app.post(api.buckets.create.path, async (req, res) => {
+    try {
+      const input = api.buckets.create.input.parse(req.body);
+      const bucket = await storage.createBucket(input);
+      res.status(201).json(bucket);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.patch(api.buckets.update.path, async (req, res) => {
+    try {
+      const input = api.buckets.update.input.parse(req.body);
+      const bucket = await storage.updateBucket(Number(req.params.id), input);
+      res.json(bucket);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "Bucket not found" });
+    }
+  });
+
+  app.delete(api.buckets.delete.path, async (req, res) => {
+    await storage.deleteBucket(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Auth - OTP
+  app.post(api.auth.sendOtp.path, async (req, res) => {
+    try {
+      const { email } = api.auth.sendOtp.input.parse(req.body);
+      const otp = generateOTP();
+      otpMap.set(email, { 
+        code: otp, 
+        expires: Date.now() + 5 * 60 * 1000,
+        verified: false 
+      });
+      console.log(`OTP for ${email}: ${otp}`);
+      res.json({ message: "OTP sent successfully" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.auth.verifyOtp.path, async (req, res) => {
+    try {
+      const { email, otp } = api.auth.verifyOtp.input.parse(req.body);
+      const stored = otpMap.get(email);
+      
+      if (!stored) {
+        return res.status(400).json({ message: "No OTP found for this email" });
+      }
+      if (Date.now() > stored.expires) {
+        otpMap.delete(email);
+        return res.status(400).json({ message: "OTP expired" });
+      }
+      if (stored.code !== otp) {
+        return res.status(400).json({ message: "Invalid OTP" });
+      }
+      
+      stored.verified = true;
+      res.json({ verified: true });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.auth.register.path, async (req, res) => {
+    try {
+      const { email, password, name, role } = api.auth.register.input.parse(req.body);
+      
+      const stored = otpMap.get(email);
+      if (!stored || !stored.verified) {
+        return res.status(400).json({ message: "Please verify OTP first" });
+      }
+      
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      const user = await storage.createUser({
+        username: email.split('@')[0],
+        email,
+        password,
+        name,
+        role: role || "User",
+        otpVerified: true,
+      });
+      
+      otpMap.delete(email);
+      res.status(201).json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.post(api.auth.login.path, async (req, res) => {
+    try {
+      const { email, password } = api.auth.login.input.parse(req.body);
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || user.password !== password) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      res.json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
   });
 
   // Seed data

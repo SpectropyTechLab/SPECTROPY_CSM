@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertProjectSchema, insertTaskSchema, insertUserSchema, projects, tasks, users } from './schema';
+import { insertProjectSchema, insertTaskSchema, insertUserSchema, insertBucketSchema, projects, tasks, users, buckets } from './schema';
 
 export const errorSchemas = {
   validation: z.object({
@@ -104,7 +104,96 @@ export const api = {
         200: z.array(z.custom<typeof users.$inferSelect>()),
       },
     },
-  }
+  },
+  buckets: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/buckets',
+      input: z.object({
+        projectId: z.coerce.number(),
+      }),
+      responses: {
+        200: z.array(z.custom<typeof buckets.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/buckets',
+      input: insertBucketSchema,
+      responses: {
+        201: z.custom<typeof buckets.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/buckets/:id',
+      input: insertBucketSchema.partial(),
+      responses: {
+        200: z.custom<typeof buckets.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/buckets/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  auth: {
+    sendOtp: {
+      method: 'POST' as const,
+      path: '/api/auth/send-otp',
+      input: z.object({
+        email: z.string().email(),
+      }),
+      responses: {
+        200: z.object({ message: z.string() }),
+        400: errorSchemas.validation,
+      },
+    },
+    verifyOtp: {
+      method: 'POST' as const,
+      path: '/api/auth/verify-otp',
+      input: z.object({
+        email: z.string().email(),
+        otp: z.string().length(6),
+      }),
+      responses: {
+        200: z.object({ verified: z.boolean() }),
+        400: errorSchemas.validation,
+      },
+    },
+    register: {
+      method: 'POST' as const,
+      path: '/api/auth/register',
+      input: z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+        name: z.string().min(1),
+        role: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login',
+      input: z.object({
+        email: z.string().email(),
+        password: z.string(),
+      }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: errorSchemas.validation,
+      },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
