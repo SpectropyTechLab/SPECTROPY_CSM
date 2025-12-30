@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, MoreHorizontal, Clock, Calendar, User as UserIcon, GripVertical } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Plus, MoreHorizontal, Clock, Calendar, User as UserIcon, GripVertical, CheckCircle2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Project, Bucket, Task, User } from "@shared/schema";
 import { motion, Reorder } from "framer-motion";
@@ -26,12 +27,19 @@ export default function ProjectBoard() {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [isNewBucketOpen, setIsNewBucketOpen] = useState(false);
+  const [isEditTaskOpen, setIsEditTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [selectedBucketId, setSelectedBucketId] = useState<number | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
   const [newBucketTitle, setNewBucketTitle] = useState("");
+  const [editTaskTitle, setEditTaskTitle] = useState("");
+  const [editTaskDescription, setEditTaskDescription] = useState("");
+  const [editTaskPriority, setEditTaskPriority] = useState("medium");
+  const [editTaskAssignee, setEditTaskAssignee] = useState<string>("");
+  const [editTaskCompleted, setEditTaskCompleted] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useQuery<Project>({
     queryKey: ["/api/projects", projectId],
@@ -148,6 +156,47 @@ export default function ProjectBoard() {
       title: newBucketTitle,
       projectId,
       position: maxPosition + 1,
+    });
+  };
+
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+    setEditTaskDescription(task.description || "");
+    setEditTaskPriority(task.priority);
+    setEditTaskAssignee(task.assigneeId ? String(task.assigneeId) : "");
+    setEditTaskCompleted(task.status === "completed");
+    setIsEditTaskOpen(true);
+  };
+
+  const handleSaveEditTask = () => {
+    if (!editingTask || !editTaskTitle.trim()) return;
+
+    updateTaskMutation.mutate({
+      id: editingTask.id,
+      title: editTaskTitle,
+      description: editTaskDescription,
+      priority: editTaskPriority,
+      assigneeId: editTaskAssignee ? Number(editTaskAssignee) : null,
+      status: editTaskCompleted ? "completed" : editingTask.status === "completed" ? "todo" : editingTask.status,
+      history: [
+        ...(editingTask.history || []),
+        `Updated on ${new Date().toLocaleDateString()}`,
+      ],
+    });
+    setIsEditTaskOpen(false);
+    setEditingTask(null);
+  };
+
+  const handleToggleTaskComplete = (task: Task, completed: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateTaskMutation.mutate({
+      id: task.id,
+      status: completed ? "completed" : "todo",
+      history: [
+        ...(task.history || []),
+        `${completed ? "Marked as completed" : "Marked as incomplete"} on ${new Date().toLocaleDateString()}`,
+      ],
     });
   };
 
@@ -308,11 +357,31 @@ export default function ProjectBoard() {
                       }`}
                       data-testid={`task-card-${task.id}`}
                     >
-                      <Card className="p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate">
+                      <Card 
+                        className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate cursor-pointer ${
+                          task.status === "completed" ? "opacity-60" : ""
+                        }`}
+                        onClick={() => handleOpenEditTask(task)}
+                      >
                         <div className="flex items-start gap-2">
+                          <div 
+                            className="flex-shrink-0 mt-0.5"
+                            onClick={(e) => handleToggleTaskComplete(task, task.status !== "completed", e)}
+                          >
+                            <Checkbox
+                              checked={task.status === "completed"}
+                              className="h-4 w-4"
+                              data-testid={`checkbox-task-${task.id}`}
+                            />
+                          </div>
                           <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate" data-testid={`text-task-title-${task.id}`}>
+                            <p 
+                              className={`font-medium text-sm truncate ${
+                                task.status === "completed" ? "line-through text-muted-foreground" : ""
+                              }`} 
+                              data-testid={`text-task-title-${task.id}`}
+                            >
                               {task.title}
                             </p>
                             {task.description && (
@@ -327,6 +396,12 @@ export default function ProjectBoard() {
                               >
                                 {task.priority}
                               </Badge>
+                              {task.status === "completed" && (
+                                <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Done
+                                </Badge>
+                              )}
                               {(task.estimateHours || task.estimateMinutes) ? (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
@@ -425,6 +500,74 @@ export default function ProjectBoard() {
               data-testid="button-submit-task"
             >
               Add Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditTaskOpen} onOpenChange={setIsEditTaskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="edit-task-completed"
+                checked={editTaskCompleted}
+                onCheckedChange={(checked) => setEditTaskCompleted(checked === true)}
+                data-testid="checkbox-edit-task-completed"
+              />
+              <label htmlFor="edit-task-completed" className="text-sm font-medium cursor-pointer">
+                Mark as completed
+              </label>
+            </div>
+            <Input
+              placeholder="Task title..."
+              value={editTaskTitle}
+              onChange={(e) => setEditTaskTitle(e.target.value)}
+              data-testid="input-edit-task-title"
+            />
+            <Textarea
+              placeholder="Description (optional)..."
+              value={editTaskDescription}
+              onChange={(e) => setEditTaskDescription(e.target.value)}
+              data-testid="input-edit-task-description"
+            />
+            <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+              <SelectTrigger data-testid="select-edit-task-priority">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={editTaskAssignee} onValueChange={setEditTaskAssignee}>
+              <SelectTrigger data-testid="select-edit-task-assignee">
+                <SelectValue placeholder="Assign to..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Unassigned</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={handleSaveEditTask}
+              disabled={updateTaskMutation.isPending}
+              data-testid="button-save-edit-task"
+            >
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

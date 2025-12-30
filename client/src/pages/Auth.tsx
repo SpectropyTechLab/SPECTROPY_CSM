@@ -1,10 +1,22 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -22,13 +34,13 @@ const Auth = () => {
     email: "",
     password: "",
     role: "User",
-    otp: ""
+    otp: "",
   });
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
     const userRole = localStorage.getItem("userRole");
-    
+
     if (isAuthenticated && userRole) {
       setLocation(userRole === "Admin" ? "/dashboard" : "/my-projects");
     }
@@ -48,7 +60,9 @@ const Auth = () => {
       setLocation(user.role === "Admin" ? "/dashboard" : "/my-projects");
     },
     onError: (err: Error) => {
-      setError(err.message.includes("401") ? "Invalid email or password" : err.message);
+      setError(
+        err.message.includes("401") ? "Invalid email or password" : err.message,
+      );
     },
   });
 
@@ -83,7 +97,12 @@ const Auth = () => {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string; name: string; role: string }) => {
+    mutationFn: async (data: {
+      email: string;
+      password: string;
+      name: string;
+      role: string;
+    }) => {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return res.json();
     },
@@ -151,49 +170,54 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <Button 
-        variant="ghost" 
-        onClick={() => setLocation("/")}
-        className="mb-4 text-slate-500 hover:text-primary self-start ml-0 md:ml-[-10rem] flex items-center gap-2"
-        data-testid="button-back-to-welcome"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Welcome
-      </Button>
       <Card className="w-full max-w-md animate-fade border-slate-200 bg-white shadow-2xl">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center text-primary" data-testid="text-auth-title">
+          <CardTitle
+            className="text-2xl font-bold text-center text-primary"
+            data-testid="text-auth-title"
+          >
             {isLogin ? "Login to Spectropy PMS" : "Register for Spectropy PMS"}
           </CardTitle>
           <CardDescription className="text-center text-slate-400">
-            {isLogin ? "Enter your credentials to access your workspace" : "Create an account to get started with your projects"}
+            {isLogin
+              ? "Enter your credentials to access your workspace"
+              : "Create an account to get started with your projects"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+              <Alert
+                variant="destructive"
+                className="bg-destructive/10 border-destructive/20 text-destructive"
+              >
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription data-testid="text-error-message">{error}</AlertDescription>
+                <AlertDescription data-testid="text-error-message">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
             {success && (
               <Alert className="bg-emerald-50 border-emerald-200 text-emerald-700">
                 <CheckCircle className="h-4 w-4" />
-                <AlertDescription data-testid="text-success-message">{success}</AlertDescription>
+                <AlertDescription data-testid="text-success-message">
+                  {success}
+                </AlertDescription>
               </Alert>
             )}
 
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-700">Full Name</Label>
-                  <Input 
+                  <Label htmlFor="name" className="text-slate-700">
+                    Full Name
+                  </Label>
+                  <Input
                     id="name"
-                    name="name" 
-                    placeholder="John Doe" 
-                    onChange={handleChange} 
+                    name="name"
+                    placeholder="John Doe"
+                    onChange={handleChange}
                     value={form.name}
                     className="border-slate-300"
                     data-testid="input-name"
@@ -201,8 +225,14 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-slate-700">Account Role</Label>
-                  <Select onValueChange={handleRoleChange} defaultValue={form.role}>
-                    <SelectTrigger className="border-slate-300" data-testid="select-role">
+                  <Select
+                    onValueChange={handleRoleChange}
+                    defaultValue={form.role}
+                  >
+                    <SelectTrigger
+                      className="border-slate-300"
+                      data-testid="select-role"
+                    >
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
@@ -215,14 +245,16 @@ const Auth = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700">Email Address</Label>
-              <Input 
+              <Label htmlFor="email" className="text-slate-700">
+                Email Address
+              </Label>
+              <Input
                 id="email"
-                name="email" 
-                type="email" 
-                placeholder="admin@spectropy.com" 
-                required 
-                onChange={handleChange} 
+                name="email"
+                type="email"
+                placeholder="admin@spectropy.com"
+                required
+                onChange={handleChange}
                 value={form.email}
                 className="border-slate-300"
                 data-testid="input-email"
@@ -230,14 +262,16 @@ const Auth = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700">Password</Label>
-              <Input 
+              <Label htmlFor="password" className="text-slate-700">
+                Password
+              </Label>
+              <Input
                 id="password"
-                name="password" 
-                type="password" 
+                name="password"
+                type="password"
                 placeholder="Enter password"
-                required 
-                onChange={handleChange} 
+                required
+                onChange={handleChange}
                 value={form.password}
                 className="border-slate-300"
                 data-testid="input-password"
@@ -246,12 +280,16 @@ const Auth = () => {
 
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="otp" className="text-slate-700">Email Verification (OTP)</Label>
+                <Label htmlFor="otp" className="text-slate-700">
+                  Email Verification (OTP)
+                </Label>
                 <div className="flex gap-2">
-                  <Input 
+                  <Input
                     id="otp"
-                    name="otp" 
-                    placeholder={otpSent ? "Enter 6-digit OTP" : "Request OTP first"}
+                    name="otp"
+                    placeholder={
+                      otpSent ? "Enter 6-digit OTP" : "Request OTP first"
+                    }
                     value={form.otp}
                     onChange={handleChange}
                     disabled={!otpSent || otpVerified}
@@ -259,26 +297,34 @@ const Auth = () => {
                     data-testid="input-otp"
                   />
                   {!otpSent ? (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={handleSendOtp}
                       disabled={sendOtpMutation.isPending}
                       className="border-slate-300"
                       data-testid="button-send-otp"
                     >
-                      {sendOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send OTP"}
+                      {sendOtpMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Send OTP"
+                      )}
                     </Button>
                   ) : !otpVerified ? (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={handleVerifyOtp}
                       disabled={verifyOtpMutation.isPending}
                       className="border-slate-300"
                       data-testid="button-verify-otp"
                     >
-                      {verifyOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                      {verifyOtpMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Verify"
+                      )}
                     </Button>
                   ) : (
                     <div className="flex items-center px-3 text-emerald-600">
@@ -287,13 +333,15 @@ const Auth = () => {
                   )}
                 </div>
                 {otpSent && !otpVerified && (
-                  <p className="text-xs text-slate-500">Check server console for the OTP code.</p>
+                  <p className="text-xs text-slate-500">
+                    Check server console for the OTP code.
+                  </p>
                 )}
               </div>
             )}
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-indigo-600 text-white font-semibold h-11 transition-all"
               disabled={isLoading || (!isLogin && !otpVerified)}
               data-testid="button-submit"
@@ -305,27 +353,43 @@ const Auth = () => {
 
           <div className="mt-6 text-center text-sm text-slate-500">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button 
+            <button
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError(null);
                 setSuccess(null);
                 setOtpSent(false);
                 setOtpVerified(false);
-              }} 
+              }}
               className="text-accent hover:underline font-medium transition-colors"
               data-testid="button-toggle-auth-mode"
             >
               {isLogin ? "Register here" : "Login here"}
             </button>
           </div>
-
+          <Button
+            variant="ghost"
+            onClick={() => setLocation("/")}
+            className="mb-4 text-slate-500 hover:text-primary self-start ml-0  flex items-center gap-2 w-full justify-center"
+            data-testid="button-back-to-welcome"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Welcome
+          </Button>
           {isLogin && (
             <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
               <p className="text-xs text-slate-500 text-center">
-                Test Credentials:<br />
-                <span className="font-mono">admin@spectropy.com / admin123</span> (Admin)<br />
-                <span className="font-mono">user@spectropy.com / user123</span> (User)
+                Test Credentials:
+                <br />
+                <span className="font-mono">
+                  admin@spectropy.com / admin123
+                </span>{" "}
+                (Admin)
+                <br />
+                <span className="font-mono">
+                  user@spectropy.com / user123
+                </span>{" "}
+                (User)
               </p>
             </div>
           )}
