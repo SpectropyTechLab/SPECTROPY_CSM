@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 
 const mockUserDB = [
   { email: "admin@spectropy.com", password: "admin123", role: "Admin" },
@@ -65,8 +65,16 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md animate-fade border-slate-700 bg-slate-900 shadow-2xl">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <Button 
+        variant="ghost" 
+        onClick={() => setLocation("/")}
+        className="mb-4 text-slate-500 hover:text-primary self-start ml-0 md:ml-[-10rem] flex items-center gap-2"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Welcome
+      </Button>
+      <Card className="w-full max-w-md animate-fade border-slate-200 bg-white shadow-2xl">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center text-primary">
             {isLogin ? "Login to Spectropy PMS" : "Register for Spectropy PMS"}

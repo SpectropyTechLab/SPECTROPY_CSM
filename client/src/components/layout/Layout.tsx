@@ -11,7 +11,7 @@ export function Layout({ children }: LayoutProps) {
   }, []);
 
   return (
-    <div className="min-h-screen flex bg-background text-white font-sans">
+    <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans">
       <Sidebar />
       <main className="flex-1 p-6 md:pl-72 overflow-y-auto animate-in fade-in duration-500">
         <div className="max-w-7xl mx-auto">
