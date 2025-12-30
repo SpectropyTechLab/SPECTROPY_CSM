@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [, setLocation] = useLocation();
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    role: "Admin"
+    role: "User"
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,12 +26,20 @@ const Auth = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log(isLogin ? "Logging in" : "Registering", form);
+
     if (isLogin) {
-      console.log("Logging in with:", form.email, form.password);
-      // Later: fetch POST /api/auth/login
+      // Temporarily store role in localStorage to simulate session
+      localStorage.setItem("userRole", form.role);
+      
+      // Redirect based on role
+      if (form.role === "Admin") {
+        setLocation("/dashboard");
+      } else {
+        setLocation("/my-projects");
+      }
     } else {
-      console.log("Registering with:", form);
-      // Later: fetch POST /api/auth/register
+      setIsLogin(true); // Return to login mode after register
     }
   };
 

@@ -1,0 +1,219 @@
+# 🔐 Phase 2 – SPECTROPY PMS: Authentication & Role-Based Access (RBAC)
+
+---
+
+## ✅ OBJECTIVE
+
+We are building a **complete authentication module** for Spectropy PMS with the following goals:
+
+- A single page to **Login/Register with role toggle**
+- Use **Email + Password** auth for now (Phone/OTP optional placeholder)
+- Two roles: **Admin** and **Standard User**
+- On successful login, users are redirected based on role:
+  - Admin → `/dashboard`
+  - Standard User → `/my-projects`
+- Setup **route protection** (unauthenticated users shouldn't access internal pages)
+- Apply **Spectropy’s dev21 dark UI theme** for a modern, futuristic look
+
+---
+
+## 📁 FILE STRUCTURE & PLACEMENT
+
+Create the following file in your frontend:
+
+```
+/frontend/src/pages/Auth.jsx
+```
+
+Update the **router** (likely `App.jsx` or `Routes.jsx`) to include:
+
+```jsx
+import Auth from './pages/Auth';
+
+<Route path="/auth" element={<Auth />} />
+```
+
+This allows the route `/auth` to load the login/register screen.
+
+---
+
+## 🔧 COMPONENT FUNCTIONALITY
+
+The `Auth.jsx` component should:
+
+- Use internal `useState` to toggle between Login/Register modes
+- Collect user input:
+  - Login: email, password
+  - Register: name, email, password, role
+- Simulate authentication via `console.log()` and route redirection
+- Store logged-in user’s role temporarily in `localStorage` or `context` (no backend yet)
+- Style using TailwindCSS with dev21 palette (`bg-background`, `text-primary`, `text-accent`, etc.)
+- Prepare the UI for future **OTP / Phone auth** field (hidden/commented)
+
+---
+
+## ⚠️ THINGS TO BE CAREFUL ABOUT
+
+| Area | Instruction |
+|------|-------------|
+| Form Toggle | Use conditional rendering inside the same form |
+| Role Field | Default role = “User” |
+| Submit Action | On login, simulate redirection using `useNavigate()` |
+| Storage | Temporarily store `role` in `localStorage` or Context API |
+| Style Consistency | Buttons must use hover + transition classes |
+| Responsiveness | Use `max-w-md` and `min-h-screen` for centering |
+| Routing | Avoid letting users directly access `/dashboard` or `/my-projects` without login (see Protected Routes below) |
+
+---
+
+## 🧱 AUTH COMPONENT SCAFFOLD
+
+Create `Auth.jsx` using this layout scaffold:
+
+```jsx
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const Auth = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [form, setForm] = useState({
+    name: "", email: "", password: "", role: "User"
+  });
+  const navigate = useNavigate();
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log(isLogin ? "Logging in" : "Registering", form);
+
+    if (isLogin) {
+      // Store role temporarily (simulate session)
+      localStorage.setItem("userRole", form.role);
+      navigate(form.role === "Admin" ? "/dashboard" : "/my-projects");
+    } else {
+      setIsLogin(true); // After register, return to login screen
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-white flex items-center justify-center px-4">
+      <div className="w-full max-w-md p-8 bg-slate-900 rounded-2xl shadow-xl animate-fade space-y-6">
+        <h2 className="text-2xl font-bold text-center text-primary">
+          {isLogin ? "Login to Spectropy PMS" : "Register for Spectropy PMS"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <>
+              <input name="name" onChange={handleChange} value={form.name}
+                     placeholder="Full Name" className="w-full p-2 rounded bg-slate-800" />
+              <select name="role" onChange={handleChange} value={form.role}
+                      className="w-full p-2 rounded bg-slate-800">
+                <option value="User">Standard User</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </>
+          )}
+
+          <input name="email" type="email" required
+                 onChange={handleChange} value={form.email}
+                 placeholder="Email" className="w-full p-2 rounded bg-slate-800" />
+          <input name="password" type="password" required
+                 onChange={handleChange} value={form.password}
+                 placeholder="Password" className="w-full p-2 rounded bg-slate-800" />
+
+          {/* 🔒 Future: Add OTP field here */}
+
+          <button type="submit"
+                  className="w-full bg-primary hover:bg-indigo-600 py-2 rounded transition font-semibold">
+            {isLogin ? "Login" : "Register"}
+          </button>
+        </form>
+
+        <p className="text-sm text-center text-slate-400">
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button onClick={() => setIsLogin(!isLogin)} className="text-accent hover:underline">
+            {isLogin ? "Register here" : "Login here"}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Auth;
+```
+
+---
+
+## 🔐 PROTECTED ROUTES (Phase 2.5)
+
+To **prevent unauthorized access**, create a wrapper component:
+
+📁 `/frontend/src/routes/ProtectedRoute.jsx`
+
+```jsx
+import { Navigate } from "react-router-dom";
+
+const ProtectedRoute = ({ children, role }) => {
+  const storedRole = localStorage.getItem("userRole");
+
+  if (!storedRole) return <Navigate to="/auth" />;
+  if (role && storedRole !== role) return <Navigate to="/auth" />;
+
+  return children;
+};
+
+export default ProtectedRoute;
+```
+
+Then, in your router:
+
+```jsx
+import ProtectedRoute from "./routes/ProtectedRoute";
+import Dashboard from "./pages/Dashboard";
+import MyProjects from "./pages/MyProjects";
+
+<Route path="/dashboard" element={
+  <ProtectedRoute role="Admin">
+    <Dashboard />
+  </ProtectedRoute>
+} />
+
+<Route path="/my-projects" element={
+  <ProtectedRoute role="User">
+    <MyProjects />
+  </ProtectedRoute>
+} />
+```
+
+---
+
+## 🔄 FLOW DIAGRAM (Visual Summary)
+
+```txt
+                [Landing Page]
+                       ↓
+               [ /auth (Login/Register) ]
+                 ↙                ↘
+         Register Form         Login Form
+               ↓                   ↓
+        Save role in LS      Check role → redirect
+               ↓                   ↓
+         [localStorage]     Admin → /dashboard
+                             User  → /my-projects
+
+ All routes are protected by <ProtectedRoute>
+```
+
+---
+
+## ✅ ONCE THIS IS COMPLETE...
+
+You're ready to:
+- Proceed to **Phase 3 – Layout & Shell UI**
+- Build Left Sidebar, TopBar, and content layout
+- Begin dashboard or project listing view
+
+Would you like me to generate **Phase 3 – Layout Shell Prompt (SCR-002)** next, sir?

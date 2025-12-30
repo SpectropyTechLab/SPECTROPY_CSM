@@ -9,28 +9,48 @@ import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import Tasks from "@/pages/Tasks";
 import Auth from "@/pages/Auth";
+import MyProjects from "@/pages/MyProjects";
 import NotFound from "@/pages/not-found";
+import { ProtectedRoute } from "@/routes/ProtectedRoute";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/auth" component={Auth} />
+      
+      {/* Protected Admin Routes */}
       <Route path="/dashboard">
-        <Layout>
-          <Dashboard />
-        </Layout>
+        <ProtectedRoute role="Admin">
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
       </Route>
       <Route path="/projects">
-        <Layout>
-          <Projects />
-        </Layout>
+        <ProtectedRoute role="Admin">
+          <Layout>
+            <Projects />
+          </Layout>
+        </ProtectedRoute>
       </Route>
       <Route path="/tasks">
-        <Layout>
-          <Tasks />
-        </Layout>
+        <ProtectedRoute role="Admin">
+          <Layout>
+            <Tasks />
+          </Layout>
+        </ProtectedRoute>
       </Route>
+
+      {/* Protected User Routes */}
+      <Route path="/my-projects">
+        <ProtectedRoute role="User">
+          <Layout>
+            <MyProjects />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
