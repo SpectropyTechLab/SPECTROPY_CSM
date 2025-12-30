@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   Hexagon,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ export function Sidebar() {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Projects", href: "/projects", icon: FolderKanban },
     { label: "Tasks", href: "/tasks", icon: CheckSquare },
+    { label: "Reports", href: "/reports", icon: BarChart3 },
   ];
 
   const handleLogout = () => {

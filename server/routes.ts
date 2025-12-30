@@ -334,6 +334,98 @@ export async function registerRoutes(
     }
   });
 
+  // Reports API
+  app.get('/api/reports/summary', async (req, res) => {
+    const projects = await storage.getProjects();
+    const tasks = await storage.getTasks();
+    const users = await storage.getUsers();
+    const activeUsers = users.filter(u => u.otpVerified);
+    
+    res.json({
+      totalProjects: projects.length,
+      totalTasks: tasks.length,
+      activeUsers: activeUsers.length,
+    });
+  });
+
+  app.get('/api/reports/project-progress', async (req, res) => {
+    const projects = await storage.getProjects();
+    const tasks = await storage.getTasks();
+    
+    const projectProgress = projects.map(project => {
+      const projectTasks = tasks.filter(t => t.projectId === project.id);
+      const completed = projectTasks.filter(t => t.status === 'completed').length;
+      return {
+        name: project.name,
+        completed,
+        total: projectTasks.length,
+        percentage: projectTasks.length > 0 ? Math.round((completed / projectTasks.length) * 100) : 0,
+      };
+    });
+    
+    res.json(projectProgress);
+  });
+
+  app.get('/api/reports/user-performance', async (req, res) => {
+    const users = await storage.getUsers();
+    const tasks = await storage.getTasks();
+    
+    const userPerformance = users.map(user => {
+      const userTasks = tasks.filter(t => t.assigneeId === user.id);
+      const completed = userTasks.filter(t => t.status === 'completed').length;
+      const totalEstimate = userTasks.reduce((acc, t) => acc + (t.estimateHours || 0) + (t.estimateMinutes || 0) / 60, 0);
+      const avgTime = userTasks.length > 0 ? totalEstimate / userTasks.length : 0;
+      return {
+        user: user.name,
+        userId: user.id,
+        completed,
+        total: userTasks.length,
+        avgTime: Math.round(avgTime * 10) / 10,
+      };
+    }).filter(u => u.total > 0);
+    
+    res.json(userPerformance);
+  });
+
+  app.get('/api/reports/bucket-stats', async (req, res) => {
+    const tasks = await storage.getTasks();
+    const projects = await storage.getProjects();
+    
+    const bucketStats: { bucket: string; count: number }[] = [];
+    
+    for (const project of projects) {
+      const buckets = await storage.getBuckets(project.id);
+      for (const bucket of buckets) {
+        const existingBucket = bucketStats.find(b => b.bucket === bucket.title);
+        const bucketTaskCount = tasks.filter(t => t.bucketId === bucket.id).length;
+        if (existingBucket) {
+          existingBucket.count += bucketTaskCount;
+        } else {
+          bucketStats.push({ bucket: bucket.title, count: bucketTaskCount });
+        }
+      }
+    }
+    
+    res.json(bucketStats);
+  });
+
+  app.get('/api/reports/status-breakdown', async (req, res) => {
+    const tasks = await storage.getTasks();
+    
+    const statusMap: Record<string, number> = {};
+    tasks.forEach(task => {
+      const status = task.status || 'unknown';
+      statusMap[status] = (statusMap[status] || 0) + 1;
+    });
+    
+    const statusBreakdown = Object.entries(statusMap).map(([status, count]) => ({
+      status: status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' '),
+      count,
+    }));
+    
+    res.json(statusBreakdown);
+  });
+
   // Seed data
   seedDatabase();
 
