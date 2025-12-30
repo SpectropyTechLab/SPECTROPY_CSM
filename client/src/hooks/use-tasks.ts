@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type CreateTaskRequest, type UpdateTaskRequest } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 export function useTasks(projectId?: number) {
   return useQuery({

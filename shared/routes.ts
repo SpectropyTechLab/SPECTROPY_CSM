@@ -118,3 +118,8 @@ export function buildUrl(path: string, params?: Record<string, string | number>)
   }
   return url;
 }
+
+export type CreateProjectRequest = z.infer<typeof insertProjectSchema>;
+export type UpdateProjectRequest = z.infer<typeof insertProjectSchema> & { id: number };
+export type CreateTaskRequest = z.infer<typeof insertTaskSchema>;
+export type UpdateTaskRequest = z.infer<typeof insertTaskSchema> & { id: number };
