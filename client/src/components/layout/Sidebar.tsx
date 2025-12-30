@@ -11,6 +11,11 @@ export function Sidebar() {
     { label: "Tasks", href: "/tasks", icon: CheckSquare },
   ];
 
+  const handleLogout = () => {
+    localStorage.removeItem("userRole");
+    window.location.href = "/auth";
+  };
+
   return (
     <aside className="w-64 h-screen bg-card border-r border-border flex flex-col fixed left-0 top-0 z-20 hidden md:flex">
       <div className="p-6 flex items-center gap-3">
@@ -56,7 +61,10 @@ export function Sidebar() {
             <span className="font-medium">Settings</span>
           </div>
         </Link>
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 cursor-pointer transition-colors mt-1">
+        <button 
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-destructive hover:bg-destructive/10 cursor-pointer transition-colors mt-1"
+        >
           <LogOut className="w-5 h-5" />
           <span className="font-medium">Logout</span>
         </button>
