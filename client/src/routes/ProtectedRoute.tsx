@@ -8,17 +8,18 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, role }: ProtectedRouteProps) => {
   const [location, setLocation] = useLocation();
+  const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
   const storedRole = localStorage.getItem("userRole");
 
   useEffect(() => {
-    if (!storedRole) {
+    if (!isAuthenticated || !storedRole) {
       setLocation("/auth");
     } else if (role && storedRole !== role) {
       setLocation("/auth");
     }
-  }, [storedRole, role, setLocation]);
+  }, [isAuthenticated, storedRole, role, setLocation]);
 
-  if (!storedRole || (role && storedRole !== role)) {
+  if (!isAuthenticated || !storedRole || (role && storedRole !== role)) {
     return null;
   }
 

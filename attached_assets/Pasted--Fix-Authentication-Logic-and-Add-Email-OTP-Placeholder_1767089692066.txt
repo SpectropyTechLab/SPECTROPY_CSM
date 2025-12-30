@@ -1,0 +1,75 @@
+# 🔐 Fix Authentication Logic and Add Email OTP Placeholder (Phase 2 Patch)
+
+## Objective:
+Fix and enhance the authentication flow in the Spectropy PMS. The current Auth.jsx component is not validating email/password properly and doesn't retain login status. Here's what needs to be fixed.
+
+---
+
+## ✅ TASKS TO DO:
+
+### 1. 🔒 Login Validation
+- Add basic **validation logic** that checks entered email & password against a mock `userDB` object for now.
+- If credentials are incorrect, show an error message using `useState`.
+
+### 2. ✉️ OTP Placeholder in Register
+- In the **Register section**, add a non-functional input field for `OTP`.
+- Add a `Send OTP` button next to it for future use (can be disabled for now).
+
+### 3. 💾 Persist Login with Cache
+- Store the following in `localStorage` after login:
+  - `userEmail`
+  - `userRole`
+  - `isAuthenticated = true`
+- Use `useEffect` to check this on app load and redirect accordingly to `/dashboard` or `/my-projects`.
+
+### 4. 🔁 Auto-Redirect on Reload
+- If `isAuthenticated` is `true` in localStorage:
+  - Automatically redirect user to `/dashboard` or `/my-projects` based on stored role.
+- Prevent user from manually navigating back to `/auth`.
+
+### 5. 🚫 Protect Auth Page from Logged-in Users
+- If a user is already authenticated (localStorage contains `isAuthenticated = true`), redirect them away from `/auth` to their respective home page.
+
+---
+
+## 🔧 WHERE TO IMPLEMENT
+
+Update the following file:
+```
+/frontend/src/pages/Auth.jsx
+```
+
+Use `useEffect` to check localStorage and `navigate()` accordingly.
+
+---
+
+## ⚠️ THINGS TO BE CAREFUL ABOUT
+
+| Area | Notes |
+|------|-------|
+| Local Storage Keys | Use simple consistent keys like `"userRole"` and `"isAuthenticated"` |
+| useEffect | Must run once at top of Auth.jsx to redirect logged-in users |
+| UI | OTP field should be styled but non-functional |
+| Error Display | Show a red message below login if credentials are invalid |
+| UX | On logout, clear all cached values and redirect to `/auth` |
+
+---
+
+## Example Mock UserDB (for validation)
+```jsx
+const mockUserDB = [
+  { email: "admin@spectropy.com", password: "admin123", role: "Admin" },
+  { email: "user@spectropy.com", password: "user123", role: "User" }
+];
+```
+
+Use this for comparison when logging in.
+
+---
+
+## After This:
+Once done, you should:
+- Stay logged in after page reload
+- Only see auth page if not logged in
+- Prepare backend integration for OTP next
+

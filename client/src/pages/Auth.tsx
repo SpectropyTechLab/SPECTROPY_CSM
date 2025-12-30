@@ -1,84 +1,111 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+
+const mockUserDB = [
+  { email: "admin@spectropy.com", password: "admin123", role: "Admin" },
+  { email: "user@spectropy.com", password: "user123", role: "User" }
+];
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [, setLocation] = useLocation();
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    role: "User"
+    role: "User",
+    otp: ""
   });
+
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
+    const userRole = localStorage.getItem("userRole");
+    
+    if (isAuthenticated && userRole) {
+      setLocation(userRole === "Admin" ? "/dashboard" : "/my-projects");
+    }
+  }, [setLocation]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setError(null);
   };
 
   const handleRoleChange = (value: string) => {
     setForm({ ...form, role: value });
+    setError(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(isLogin ? "Logging in" : "Registering", form);
+    setError(null);
 
     if (isLogin) {
-      // Temporarily store role in localStorage to simulate session
-      localStorage.setItem("userRole", form.role);
+      const user = mockUserDB.find(u => u.email === form.email && u.password === form.password);
       
-      // Redirect based on role
-      if (form.role === "Admin") {
-        setLocation("/dashboard");
+      if (user) {
+        localStorage.setItem("userRole", user.role);
+        localStorage.setItem("userEmail", user.email);
+        localStorage.setItem("isAuthenticated", "true");
+        setLocation(user.role === "Admin" ? "/dashboard" : "/my-projects");
       } else {
-        setLocation("/my-projects");
+        setError("Invalid email or password. Please try again.");
       }
     } else {
-      setIsLogin(true); // Return to login mode after register
+      setIsLogin(true);
     }
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md animate-fade border-slate-700 bg-slate-900 shadow-2xl">
-        <CardHeader>
+        <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center text-primary">
             {isLogin ? "Login to Spectropy PMS" : "Register for Spectropy PMS"}
           </CardTitle>
+          <CardDescription className="text-center text-slate-400">
+            {isLogin ? "Enter your credentials to access your workspace" : "Create an account to get started with your projects"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive" className="bg-destructive/10 border-destructive/20 text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-200">Full Name</Label>
-                  <Input
+                  <Label htmlFor="name" className="text-slate-300">Full Name</Label>
+                  <Input 
                     id="name"
-                    type="text"
-                    name="name"
-                    placeholder="John Doe"
+                    name="name" 
+                    placeholder="John Doe" 
+                    onChange={handleChange} 
                     value={form.name}
-                    onChange={handleChange}
-                    required
-                    className="bg-slate-800 border-slate-700 text-white"
+                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-slate-200">Role</Label>
-                  <Select value={form.role} onValueChange={handleRoleChange}>
+                  <Label className="text-slate-300">Account Role</Label>
+                  <Select onValueChange={handleRoleChange} defaultValue={form.role}>
                     <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
                       <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                      <SelectItem value="User">Standard User</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Developer">Developer</SelectItem>
-                      <SelectItem value="SME">SME</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -86,46 +113,65 @@ const Auth = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-200">Email</Label>
-              <Input
+              <Label htmlFor="email" className="text-slate-300">Email Address</Label>
+              <Input 
                 id="email"
-                type="email"
-                name="email"
-                placeholder="name@example.com"
+                name="email" 
+                type="email" 
+                placeholder="admin@spectropy.com" 
+                required 
+                onChange={handleChange} 
                 value={form.email}
-                onChange={handleChange}
-                required
-                className="bg-slate-800 border-slate-700 text-white"
+                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-200">Password</Label>
-              <Input
+              <Label htmlFor="password" className="text-slate-300">Password</Label>
+              <Input 
                 id="password"
-                type="password"
-                name="password"
+                name="password" 
+                type="password" 
                 placeholder="••••••••"
+                required 
+                onChange={handleChange} 
                 value={form.password}
-                onChange={handleChange}
-                required
-                className="bg-slate-800 border-slate-700 text-white"
+                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
               />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-indigo-600 text-white font-semibold transition-all"
-            >
-              {isLogin ? "Login" : "Register"}
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="otp" className="text-slate-300">Email Verification (OTP)</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="otp"
+                    name="otp" 
+                    placeholder="Enter OTP"
+                    disabled
+                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 flex-1"
+                  />
+                  <Button type="button" variant="outline" disabled className="border-slate-700 text-slate-400">
+                    Send OTP
+                  </Button>
+                </div>
+                <p className="text-[10px] text-slate-500 italic">OTP verification will be enabled in Phase 3 backend integration.</p>
+              </div>
+            )}
+
+            <Button type="submit" className="w-full bg-primary hover:bg-indigo-600 text-white font-semibold h-11 transition-all active:scale-95">
+              {isLogin ? "Sign In" : "Create Account"}
             </Button>
           </form>
 
-          <div className="text-center text-sm mt-6 text-slate-400">
+          <div className="mt-6 text-center text-sm text-slate-400">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              className="text-accent hover:underline font-medium"
-              onClick={() => setIsLogin(!isLogin)}
+            <button 
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError(null);
+              }} 
+              className="text-accent hover:underline font-medium transition-colors"
             >
               {isLogin ? "Register here" : "Login here"}
             </button>
