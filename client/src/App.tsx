@@ -8,12 +8,14 @@ import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import Tasks from "@/pages/Tasks";
 import Welcome from "@/pages/Welcome";
+import Auth from "@/pages/Auth";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Welcome} />
+      <Route path="/auth" component={Auth} />
       <Route path="/dashboard">
         <Layout>
           <Dashboard />
