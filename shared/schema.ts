@@ -44,6 +44,7 @@ export const tasks = pgTable("tasks", {
   estimateHours: integer("estimate_hours").default(0),
   estimateMinutes: integer("estimate_minutes").default(0),
   history: text("history").array().default([]),
+  startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),

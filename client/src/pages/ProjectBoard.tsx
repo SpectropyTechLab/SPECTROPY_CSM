@@ -7,10 +7,33 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, MoreHorizontal, Clock, Calendar, User as UserIcon, GripVertical, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  MoreHorizontal,
+  Clock,
+  Calendar,
+  User as UserIcon,
+  GripVertical,
+  CheckCircle2,
+} from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Project, Bucket, Task, User } from "@shared/schema";
 import { motion, Reorder } from "framer-motion";
@@ -34,12 +57,20 @@ export default function ProjectBoard() {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
+  const [newTaskStartDate, setNewTaskStartDate] = useState("");
+  const [newTaskEndDate, setNewTaskEndDate] = useState("");
+  const [newTaskEstimateHours, setNewTaskEstimateHours] = useState(0);
+  const [newTaskEstimateMinutes, setNewTaskEstimateMinutes] = useState(0);
   const [newBucketTitle, setNewBucketTitle] = useState("");
   const [editTaskTitle, setEditTaskTitle] = useState("");
   const [editTaskDescription, setEditTaskDescription] = useState("");
   const [editTaskPriority, setEditTaskPriority] = useState("medium");
   const [editTaskAssignee, setEditTaskAssignee] = useState<string>("");
   const [editTaskCompleted, setEditTaskCompleted] = useState(false);
+  const [editTaskStartDate, setEditTaskStartDate] = useState("");
+  const [editTaskEndDate, setEditTaskEndDate] = useState("");
+  const [editTaskEstimateHours, setEditTaskEstimateHours] = useState(0);
+  const [editTaskEstimateMinutes, setEditTaskEstimateMinutes] = useState(0);
 
   const { data: project, isLoading: projectLoading } = useQuery<Project>({
     queryKey: ["/api/projects", projectId],
@@ -144,6 +175,10 @@ export default function ProjectBoard() {
       assigneeId: newTaskAssignee ? Number(newTaskAssignee) : undefined,
       position: maxPosition + 1,
       status: "todo",
+      startDate: newTaskStartDate ? new Date(newTaskStartDate) : undefined,
+      dueDate: newTaskEndDate ? new Date(newTaskEndDate) : undefined,
+      estimateHours: newTaskEstimateHours,
+      estimateMinutes: newTaskEstimateMinutes,
       history: [`Created on ${new Date().toLocaleDateString()}`],
     });
   };
@@ -164,8 +199,14 @@ export default function ProjectBoard() {
     setEditTaskTitle(task.title);
     setEditTaskDescription(task.description || "");
     setEditTaskPriority(task.priority);
-    setEditTaskAssignee(task.assigneeId ? String(task.assigneeId) : "");
+    setEditTaskAssignee(
+      task.assigneeId ? String(task.assigneeId) : "unassigned",
+    );
     setEditTaskCompleted(task.status === "completed");
+    setEditTaskStartDate(task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "");
+    setEditTaskEndDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "");
+    setEditTaskEstimateHours(task.estimateHours || 0);
+    setEditTaskEstimateMinutes(task.estimateMinutes || 0);
     setIsEditTaskOpen(true);
   };
 
@@ -177,8 +218,19 @@ export default function ProjectBoard() {
       title: editTaskTitle,
       description: editTaskDescription,
       priority: editTaskPriority,
-      assigneeId: editTaskAssignee ? Number(editTaskAssignee) : null,
-      status: editTaskCompleted ? "completed" : editingTask.status === "completed" ? "todo" : editingTask.status,
+      assigneeId:
+        editTaskAssignee && editTaskAssignee !== "unassigned"
+          ? Number(editTaskAssignee)
+          : null,
+      status: editTaskCompleted
+        ? "completed"
+        : editingTask.status === "completed"
+          ? "todo"
+          : editingTask.status,
+      startDate: editTaskStartDate ? new Date(editTaskStartDate) : null,
+      dueDate: editTaskEndDate ? new Date(editTaskEndDate) : null,
+      estimateHours: editTaskEstimateHours,
+      estimateMinutes: editTaskEstimateMinutes,
       history: [
         ...(editingTask.history || []),
         `Updated on ${new Date().toLocaleDateString()}`,
@@ -188,7 +240,11 @@ export default function ProjectBoard() {
     setEditingTask(null);
   };
 
-  const handleToggleTaskComplete = (task: Task, completed: boolean, e: React.MouseEvent) => {
+  const handleToggleTaskComplete = (
+    task: Task,
+    completed: boolean,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
     updateTaskMutation.mutate({
       id: task.id,
@@ -230,7 +286,11 @@ export default function ProjectBoard() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground">Project not found</p>
-        <Button variant="outline" onClick={() => navigate("/projects")} className="mt-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/projects")}
+          className="mt-4"
+        >
           Back to Projects
         </Button>
       </div>
@@ -250,7 +310,10 @@ export default function ProjectBoard() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold" data-testid="text-project-name">
+            <h1
+              className="text-xl font-semibold"
+              data-testid="text-project-name"
+            >
               {project.name}
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -306,7 +369,10 @@ export default function ProjectBoard() {
             >
               <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium" data-testid={`text-bucket-title-${bucket.id}`}>
+                  <h3
+                    className="font-medium"
+                    data-testid={`text-bucket-title-${bucket.id}`}
+                  >
                     {bucket.title}
                   </h3>
                   <Badge variant="secondary" className="text-xs">
@@ -331,14 +397,23 @@ export default function ProjectBoard() {
                 className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.add(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                 }}
                 onDragLeave={(e) => {
-                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.remove(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.remove(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                   handleDrop(bucket.id, bucket.tasks.length);
                 }}
               >
@@ -357,16 +432,22 @@ export default function ProjectBoard() {
                       }`}
                       data-testid={`task-card-${task.id}`}
                     >
-                      <Card 
+                      <Card
                         className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate cursor-pointer ${
                           task.status === "completed" ? "opacity-60" : ""
                         }`}
                         onClick={() => handleOpenEditTask(task)}
                       >
                         <div className="flex items-start gap-2">
-                          <div 
+                          <div
                             className="flex-shrink-0 mt-0.5"
-                            onClick={(e) => handleToggleTaskComplete(task, task.status !== "completed", e)}
+                            onClick={(e) =>
+                              handleToggleTaskComplete(
+                                task,
+                                task.status !== "completed",
+                                e,
+                              )
+                            }
                           >
                             <Checkbox
                               checked={task.status === "completed"}
@@ -374,12 +455,14 @@ export default function ProjectBoard() {
                               data-testid={`checkbox-task-${task.id}`}
                             />
                           </div>
-                          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+
                           <div className="flex-1 min-w-0">
-                            <p 
+                            <p
                               className={`font-medium text-sm truncate ${
-                                task.status === "completed" ? "line-through text-muted-foreground" : ""
-                              }`} 
+                                task.status === "completed"
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                              }`}
                               data-testid={`text-task-title-${task.id}`}
                             >
                               {task.title}
@@ -397,33 +480,42 @@ export default function ProjectBoard() {
                                 {task.priority}
                               </Badge>
                               {task.status === "completed" && (
-                                <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                >
                                   <CheckCircle2 className="h-3 w-3 mr-1" />
                                   Done
                                 </Badge>
                               )}
-                              {(task.estimateHours || task.estimateMinutes) ? (
+                              {task.estimateHours || task.estimateMinutes ? (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
                                   {task.estimateHours}h {task.estimateMinutes}m
                                 </span>
                               ) : null}
-                              {task.dueDate && (
+                              {(task.startDate || task.dueDate) && (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Calendar className="h-3 w-3" />
-                                  {new Date(task.dueDate).toLocaleDateString()}
+                                  {task.startDate && new Date(task.startDate).toLocaleDateString()}
+                                  {task.startDate && task.dueDate && " - "}
+                                  {task.dueDate && new Date(task.dueDate).toLocaleDateString()}
                                 </span>
                               )}
                             </div>
                             {assignee && (
                               <div className="flex items-center gap-2 mt-2">
                                 <Avatar className="h-5 w-5">
-                                  <AvatarImage src={assignee.avatar || undefined} />
+                                  <AvatarImage
+                                    src={assignee.avatar || undefined}
+                                  />
                                   <AvatarFallback className="text-xs">
                                     {assignee.name.charAt(0)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-xs text-muted-foreground">{assignee.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {assignee.name}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -489,6 +581,52 @@ export default function ProjectBoard() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">Start Date</label>
+                <Input
+                  type="date"
+                  value={newTaskStartDate}
+                  onChange={(e) => setNewTaskStartDate(e.target.value)}
+                  data-testid="input-task-start-date"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">End Date</label>
+                <Input
+                  type="date"
+                  value={newTaskEndDate}
+                  onChange={(e) => setNewTaskEndDate(e.target.value)}
+                  data-testid="input-task-end-date"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">Time Estimate</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Hours"
+                  value={newTaskEstimateHours || ""}
+                  onChange={(e) => setNewTaskEstimateHours(Number(e.target.value) || 0)}
+                  className="w-24"
+                  data-testid="input-task-estimate-hours"
+                />
+                <span className="text-sm text-muted-foreground">h</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
+                  placeholder="Minutes"
+                  value={newTaskEstimateMinutes || ""}
+                  onChange={(e) => setNewTaskEstimateMinutes(Number(e.target.value) || 0)}
+                  className="w-24"
+                  data-testid="input-task-estimate-minutes"
+                />
+                <span className="text-sm text-muted-foreground">m</span>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <DialogClose asChild>
@@ -515,10 +653,15 @@ export default function ProjectBoard() {
               <Checkbox
                 id="edit-task-completed"
                 checked={editTaskCompleted}
-                onCheckedChange={(checked) => setEditTaskCompleted(checked === true)}
+                onCheckedChange={(checked) =>
+                  setEditTaskCompleted(checked === true)
+                }
                 data-testid="checkbox-edit-task-completed"
               />
-              <label htmlFor="edit-task-completed" className="text-sm font-medium cursor-pointer">
+              <label
+                htmlFor="edit-task-completed"
+                className="text-sm font-medium cursor-pointer"
+              >
                 Mark as completed
               </label>
             </div>
@@ -534,7 +677,10 @@ export default function ProjectBoard() {
               onChange={(e) => setEditTaskDescription(e.target.value)}
               data-testid="input-edit-task-description"
             />
-            <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+            <Select
+              value={editTaskPriority}
+              onValueChange={setEditTaskPriority}
+            >
               <SelectTrigger data-testid="select-edit-task-priority">
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
@@ -544,12 +690,15 @@ export default function ProjectBoard() {
                 <SelectItem value="high">High</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={editTaskAssignee} onValueChange={setEditTaskAssignee}>
+            <Select
+              value={editTaskAssignee}
+              onValueChange={setEditTaskAssignee}
+            >
               <SelectTrigger data-testid="select-edit-task-assignee">
                 <SelectValue placeholder="Assign to..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Unassigned</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
                 {users.map((user) => (
                   <SelectItem key={user.id} value={String(user.id)}>
                     {user.name}
@@ -557,6 +706,52 @@ export default function ProjectBoard() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">Start Date</label>
+                <Input
+                  type="date"
+                  value={editTaskStartDate}
+                  onChange={(e) => setEditTaskStartDate(e.target.value)}
+                  data-testid="input-edit-task-start-date"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">End Date</label>
+                <Input
+                  type="date"
+                  value={editTaskEndDate}
+                  onChange={(e) => setEditTaskEndDate(e.target.value)}
+                  data-testid="input-edit-task-end-date"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">Time Estimate</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Hours"
+                  value={editTaskEstimateHours || ""}
+                  onChange={(e) => setEditTaskEstimateHours(Number(e.target.value) || 0)}
+                  className="w-24"
+                  data-testid="input-edit-task-estimate-hours"
+                />
+                <span className="text-sm text-muted-foreground">h</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
+                  placeholder="Minutes"
+                  value={editTaskEstimateMinutes || ""}
+                  onChange={(e) => setEditTaskEstimateMinutes(Number(e.target.value) || 0)}
+                  className="w-24"
+                  data-testid="input-edit-task-estimate-minutes"
+                />
+                <span className="text-sm text-muted-foreground">m</span>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <DialogClose asChild>
