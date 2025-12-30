@@ -1,0 +1,434 @@
+import { useState, useEffect } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Plus, MoreHorizontal, Clock, Calendar, User as UserIcon, GripVertical } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Project, Bucket, Task, User } from "@shared/schema";
+import { motion, Reorder } from "framer-motion";
+
+interface BucketWithTasks extends Bucket {
+  tasks: Task[];
+}
+
+export default function ProjectBoard() {
+  const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const projectId = Number(id);
+
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  const [isNewBucketOpen, setIsNewBucketOpen] = useState(false);
+  const [selectedBucketId, setSelectedBucketId] = useState<number | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState("medium");
+  const [newTaskAssignee, setNewTaskAssignee] = useState<string>("");
+  const [newBucketTitle, setNewBucketTitle] = useState("");
+
+  const { data: project, isLoading: projectLoading } = useQuery<Project>({
+    queryKey: ["/api/projects", projectId],
+  });
+
+  const { data: buckets = [], isLoading: bucketsLoading } = useQuery<Bucket[]>({
+    queryKey: ["/api/buckets", projectId],
+    queryFn: async () => {
+      const res = await fetch(`/api/buckets?projectId=${projectId}`);
+      return res.json();
+    },
+  });
+
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", projectId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks?projectId=${projectId}`);
+      return res.json();
+    },
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: Partial<Task>) => {
+      return apiRequest("POST", "/api/tasks", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
+      setIsNewTaskOpen(false);
+      setNewTaskTitle("");
+      setNewTaskDescription("");
+      setNewTaskPriority("medium");
+      setNewTaskAssignee("");
+    },
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Task> & { id: number }) => {
+      return apiRequest("PATCH", `/api/tasks/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
+    },
+  });
+
+  const createBucketMutation = useMutation({
+    mutationFn: async (data: Partial<Bucket>) => {
+      return apiRequest("POST", "/api/buckets", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/buckets", projectId] });
+      setIsNewBucketOpen(false);
+      setNewBucketTitle("");
+    },
+  });
+
+  const bucketsWithTasks: BucketWithTasks[] = buckets.map((bucket) => ({
+    ...bucket,
+    tasks: tasks
+      .filter((task) => task.bucketId === bucket.id)
+      .sort((a, b) => a.position - b.position),
+  }));
+
+  const handleDragStart = (task: Task) => {
+    setDraggedTask(task);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTask(null);
+  };
+
+  const handleDrop = (bucketId: number, targetPosition: number) => {
+    if (!draggedTask) return;
+
+    updateTaskMutation.mutate({
+      id: draggedTask.id,
+      bucketId,
+      position: targetPosition,
+      history: [
+        ...(draggedTask.history || []),
+        `Moved to ${buckets.find((b) => b.id === bucketId)?.title} on ${new Date().toLocaleDateString()}`,
+      ],
+    });
+    setDraggedTask(null);
+  };
+
+  const handleAddTask = () => {
+    if (!newTaskTitle.trim() || !selectedBucketId) return;
+
+    const bucketTasks = tasks.filter((t) => t.bucketId === selectedBucketId);
+    const maxPosition = Math.max(...bucketTasks.map((t) => t.position), -1);
+
+    createTaskMutation.mutate({
+      title: newTaskTitle,
+      description: newTaskDescription,
+      priority: newTaskPriority,
+      projectId,
+      bucketId: selectedBucketId,
+      assigneeId: newTaskAssignee ? Number(newTaskAssignee) : undefined,
+      position: maxPosition + 1,
+      status: "todo",
+      history: [`Created on ${new Date().toLocaleDateString()}`],
+    });
+  };
+
+  const handleAddBucket = () => {
+    if (!newBucketTitle.trim()) return;
+
+    const maxPosition = Math.max(...buckets.map((b) => b.position), -1);
+    createBucketMutation.mutate({
+      title: newBucketTitle,
+      projectId,
+      position: maxPosition + 1,
+    });
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+      case "medium":
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+      case "low":
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+      default:
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
+    }
+  };
+
+  const getAssignee = (assigneeId: number | null) => {
+    if (!assigneeId) return null;
+    return users.find((u) => u.id === assigneeId);
+  };
+
+  if (projectLoading || bucketsLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-muted-foreground">Project not found</p>
+        <Button variant="outline" onClick={() => navigate("/projects")} className="mt-4">
+          Back to Projects
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between gap-4 p-4 border-b bg-white dark:bg-slate-900">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/projects")}
+            data-testid="button-back-to-projects"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold" data-testid="text-project-name">
+              {project.name}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {project.description || "No description"}
+            </p>
+          </div>
+        </div>
+
+        <Dialog open={isNewBucketOpen} onOpenChange={setIsNewBucketOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" data-testid="button-add-bucket">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Bucket
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Bucket</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Input
+                placeholder="Bucket title..."
+                value={newBucketTitle}
+                onChange={(e) => setNewBucketTitle(e.target.value)}
+                data-testid="input-bucket-title"
+              />
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button
+                onClick={handleAddBucket}
+                disabled={createBucketMutation.isPending}
+                data-testid="button-submit-bucket"
+              >
+                Add Bucket
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex-1 overflow-x-auto p-4">
+        <div className="flex gap-4 h-full" style={{ minWidth: "max-content" }}>
+          {bucketsWithTasks.map((bucket) => (
+            <motion.div
+              key={bucket.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+              data-testid={`bucket-column-${bucket.id}`}
+            >
+              <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-medium" data-testid={`text-bucket-title-${bucket.id}`}>
+                    {bucket.title}
+                  </h3>
+                  <Badge variant="secondary" className="text-xs">
+                    {bucket.tasks.length}
+                  </Badge>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setSelectedBucketId(bucket.id);
+                    setIsNewTaskOpen(true);
+                  }}
+                  data-testid={`button-add-task-${bucket.id}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div
+                className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                  handleDrop(bucket.id, bucket.tasks.length);
+                }}
+              >
+                {bucket.tasks.map((task, index) => {
+                  const assignee = getAssignee(task.assigneeId);
+                  return (
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      draggable
+                      onDragStart={() => handleDragStart(task)}
+                      onDragEnd={handleDragEnd}
+                      className={`cursor-grab active:cursor-grabbing ${
+                        draggedTask?.id === task.id ? "opacity-50" : ""
+                      }`}
+                      data-testid={`task-card-${task.id}`}
+                    >
+                      <Card className="p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate">
+                        <div className="flex items-start gap-2">
+                          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate" data-testid={`text-task-title-${task.id}`}>
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <Badge
+                                variant="secondary"
+                                className={`text-xs ${getPriorityColor(task.priority)}`}
+                              >
+                                {task.priority}
+                              </Badge>
+                              {(task.estimateHours || task.estimateMinutes) ? (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  {task.estimateHours}h {task.estimateMinutes}m
+                                </span>
+                              ) : null}
+                              {task.dueDate && (
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(task.dueDate).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            {assignee && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <Avatar className="h-5 w-5">
+                                  <AvatarImage src={assignee.avatar || undefined} />
+                                  <AvatarFallback className="text-xs">
+                                    {assignee.name.charAt(0)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs text-muted-foreground">{assignee.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+
+          <div
+            className="flex items-center justify-center w-80 min-h-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
+            onClick={() => setIsNewBucketOpen(true)}
+            data-testid="button-add-new-bucket"
+          >
+            <div className="text-center text-muted-foreground">
+              <Plus className="h-8 w-8 mx-auto mb-2" />
+              <p>Add Bucket</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              placeholder="Task title..."
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              data-testid="input-task-title"
+            />
+            <Textarea
+              placeholder="Description (optional)..."
+              value={newTaskDescription}
+              onChange={(e) => setNewTaskDescription(e.target.value)}
+              data-testid="input-task-description"
+            />
+            <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
+              <SelectTrigger data-testid="select-task-priority">
+                <SelectValue placeholder="Priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={newTaskAssignee} onValueChange={setNewTaskAssignee}>
+              <SelectTrigger data-testid="select-task-assignee">
+                <SelectValue placeholder="Assign to..." />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={handleAddTask}
+              disabled={createTaskMutation.isPending}
+              data-testid="button-submit-task"
+            >
+              Add Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

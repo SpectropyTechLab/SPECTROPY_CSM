@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout/Layout";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
+import ProjectBoard from "@/pages/ProjectBoard";
 import Tasks from "@/pages/Tasks";
 import Auth from "@/pages/Auth";
 import MyProjects from "@/pages/MyProjects";
@@ -31,6 +32,13 @@ function Router() {
         <ProtectedRoute role="Admin">
           <Layout>
             <Projects />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/projects/:id">
+        <ProtectedRoute role="Admin">
+          <Layout>
+            <ProjectBoard />
           </Layout>
         </ProtectedRoute>
       </Route>

@@ -3,33 +3,48 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import bcrypt from "bcrypt";
 
 const otpMap = new Map<string, { code: string; expires: number; verified: boolean }>();
+const SALT_ROUNDS = 10;
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
 async function seedDatabase() {
   const users = await storage.getUsers();
   if (users.length === 0) {
+    const adminHash = await hashPassword("admin123");
+    const userHash = await hashPassword("user123");
+    
     const user = await storage.createUser({
       username: "admin",
       email: "admin@spectropy.com",
-      password: "admin123",
+      password: adminHash,
       name: "Admin User",
       title: "Project Manager",
       avatar: "https://github.com/shadcn.png",
       role: "Admin",
+      otpVerified: true,
     });
 
     await storage.createUser({
       username: "user",
       email: "user@spectropy.com",
-      password: "user123",
+      password: userHash,
       name: "Standard User",
       title: "Developer",
       role: "User",
+      otpVerified: true,
     });
 
     const project = await storage.createProject({
@@ -274,17 +289,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email already registered" });
       }
       
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
         username: email.split('@')[0],
         email,
-        password,
+        password: hashedPassword,
         name,
         role: role || "User",
         otpVerified: true,
       });
       
       otpMap.delete(email);
-      res.status(201).json(user);
+      const { password: _, ...safeUser } = user;
+      res.status(201).json(safeUser);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -298,11 +315,17 @@ export async function registerRoutes(
       const { email, password } = api.auth.login.input.parse(req.body);
       
       const user = await storage.getUserByEmail(email);
-      if (!user || user.password !== password) {
+      if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
       
-      res.json(user);
+      const isValid = await verifyPassword(password, user.password);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+      
+      const { password: _, ...safeUser } = user;
+      res.json(safeUser);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
