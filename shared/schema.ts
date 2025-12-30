@@ -87,7 +87,10 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true });
-export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true });
+export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true }).extend({
+  startDate: z.union([z.coerce.date(), z.null()]).optional(),
+  dueDate: z.union([z.coerce.date(), z.null()]).optional(),
+});
 
 // Types
 export type User = typeof users.$inferSelect;

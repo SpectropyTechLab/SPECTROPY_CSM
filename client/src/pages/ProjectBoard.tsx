@@ -175,8 +175,11 @@ export default function ProjectBoard() {
       assigneeId: newTaskAssignee ? Number(newTaskAssignee) : undefined,
       position: maxPosition + 1,
       status: "todo",
-      startDate: newTaskStartDate ? new Date(newTaskStartDate) : undefined,
-      dueDate: newTaskEndDate ? new Date(newTaskEndDate) : undefined,
+      // FIX: Use null instead of undefined, and append T12:00:00 to avoid timezone shifts
+      startDate: newTaskStartDate
+        ? new Date(newTaskStartDate + "T12:00:00")
+        : null,
+      dueDate: newTaskEndDate ? new Date(newTaskEndDate + "T12:00:00") : null,
       estimateHours: newTaskEstimateHours,
       estimateMinutes: newTaskEstimateMinutes,
       history: [`Created on ${new Date().toLocaleDateString()}`],
@@ -203,8 +206,14 @@ export default function ProjectBoard() {
       task.assigneeId ? String(task.assigneeId) : "unassigned",
     );
     setEditTaskCompleted(task.status === "completed");
-    setEditTaskStartDate(task.startDate ? new Date(task.startDate).toISOString().split('T')[0] : "");
-    setEditTaskEndDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : "");
+    setEditTaskStartDate(
+      task.startDate
+        ? new Date(task.startDate).toISOString().split("T")[0]
+        : "",
+    );
+    setEditTaskEndDate(
+      task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "",
+    );
     setEditTaskEstimateHours(task.estimateHours || 0);
     setEditTaskEstimateMinutes(task.estimateMinutes || 0);
     setIsEditTaskOpen(true);
@@ -227,8 +236,11 @@ export default function ProjectBoard() {
         : editingTask.status === "completed"
           ? "todo"
           : editingTask.status,
-      startDate: editTaskStartDate ? new Date(editTaskStartDate) : null,
-      dueDate: editTaskEndDate ? new Date(editTaskEndDate) : null,
+      // FIX: Append T12:00:00 to lock the date to the middle of the day
+      startDate: editTaskStartDate
+        ? new Date(editTaskStartDate + "T12:00:00")
+        : null,
+      dueDate: editTaskEndDate ? new Date(editTaskEndDate + "T12:00:00") : null,
       estimateHours: editTaskEstimateHours,
       estimateMinutes: editTaskEstimateMinutes,
       history: [
@@ -497,9 +509,13 @@ export default function ProjectBoard() {
                               {(task.startDate || task.dueDate) && (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Calendar className="h-3 w-3" />
-                                  {task.startDate && new Date(task.startDate).toLocaleDateString()}
+                                  {task.startDate &&
+                                    new Date(
+                                      task.startDate,
+                                    ).toLocaleDateString()}
                                   {task.startDate && task.dueDate && " - "}
-                                  {task.dueDate && new Date(task.dueDate).toLocaleDateString()}
+                                  {task.dueDate &&
+                                    new Date(task.dueDate).toLocaleDateString()}
                                 </span>
                               )}
                             </div>
@@ -583,7 +599,9 @@ export default function ProjectBoard() {
             </Select>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">Start Date</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                  Start Date
+                </label>
                 <Input
                   type="date"
                   value={newTaskStartDate}
@@ -592,7 +610,9 @@ export default function ProjectBoard() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">End Date</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                  End Date
+                </label>
                 <Input
                   type="date"
                   value={newTaskEndDate}
@@ -602,14 +622,18 @@ export default function ProjectBoard() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-muted-foreground mb-1 block">Time Estimate</label>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                Time Estimate
+              </label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   min="0"
                   placeholder="Hours"
                   value={newTaskEstimateHours || ""}
-                  onChange={(e) => setNewTaskEstimateHours(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setNewTaskEstimateHours(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-task-estimate-hours"
                 />
@@ -620,7 +644,9 @@ export default function ProjectBoard() {
                   max="59"
                   placeholder="Minutes"
                   value={newTaskEstimateMinutes || ""}
-                  onChange={(e) => setNewTaskEstimateMinutes(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setNewTaskEstimateMinutes(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-task-estimate-minutes"
                 />
@@ -708,7 +734,9 @@ export default function ProjectBoard() {
             </Select>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">Start Date</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                  Start Date
+                </label>
                 <Input
                   type="date"
                   value={editTaskStartDate}
@@ -717,7 +745,9 @@ export default function ProjectBoard() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">End Date</label>
+                <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                  End Date
+                </label>
                 <Input
                   type="date"
                   value={editTaskEndDate}
@@ -727,14 +757,18 @@ export default function ProjectBoard() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-muted-foreground mb-1 block">Time Estimate</label>
+              <label className="text-sm font-medium text-muted-foreground mb-1 block">
+                Time Estimate
+              </label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   min="0"
                   placeholder="Hours"
                   value={editTaskEstimateHours || ""}
-                  onChange={(e) => setEditTaskEstimateHours(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setEditTaskEstimateHours(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-edit-task-estimate-hours"
                 />
@@ -745,7 +779,9 @@ export default function ProjectBoard() {
                   max="59"
                   placeholder="Minutes"
                   value={editTaskEstimateMinutes || ""}
-                  onChange={(e) => setEditTaskEstimateMinutes(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setEditTaskEstimateMinutes(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-edit-task-estimate-minutes"
                 />
