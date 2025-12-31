@@ -149,7 +149,11 @@ export async function registerRoutes(
   // Tasks
   app.get(api.tasks.list.path, async (req, res) => {
     const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
-    const tasks = await storage.getTasks(projectId);
+    const assigneeId = req.query.assigneeId ? Number(req.query.assigneeId) : undefined;
+    let tasks = await storage.getTasks(projectId);
+    if (assigneeId) {
+      tasks = tasks.filter(task => task.assigneeId === assigneeId);
+    }
     res.json(tasks);
   });
 
@@ -192,10 +196,14 @@ export async function registerRoutes(
 
   // Buckets
   app.get(api.buckets.list.path, async (req, res) => {
-    const projectId = Number(req.query.projectId);
-    if (!projectId) return res.status(400).json({ message: "projectId is required" });
-    const buckets = await storage.getBuckets(projectId);
-    res.json(buckets);
+    const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
+    if (projectId) {
+      const buckets = await storage.getBuckets(projectId);
+      res.json(buckets);
+    } else {
+      const allBuckets = await storage.getAllBuckets();
+      res.json(allBuckets);
+    }
   });
 
   app.post(api.buckets.create.path, async (req, res) => {

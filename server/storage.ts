@@ -29,6 +29,7 @@ export interface IStorage {
 
   // Buckets
   getBuckets(projectId: number): Promise<Bucket[]>;
+  getAllBuckets(): Promise<Bucket[]>;
   getBucket(id: number): Promise<Bucket | undefined>;
   createBucket(bucket: InsertBucket): Promise<Bucket>;
   updateBucket(id: number, updates: UpdateBucketRequest): Promise<Bucket>;
@@ -101,6 +102,10 @@ export class DatabaseStorage implements IStorage {
   // Buckets
   async getBuckets(projectId: number): Promise<Bucket[]> {
     return await db.select().from(buckets).where(eq(buckets.projectId, projectId)).orderBy(asc(buckets.position));
+  }
+
+  async getAllBuckets(): Promise<Bucket[]> {
+    return await db.select().from(buckets).orderBy(asc(buckets.position));
   }
 
   async getBucket(id: number): Promise<Bucket | undefined> {

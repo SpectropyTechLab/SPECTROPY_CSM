@@ -42,7 +42,7 @@ const Auth = () => {
     const userRole = localStorage.getItem("userRole");
 
     if (isAuthenticated && userRole) {
-      setLocation(userRole === "Admin" ? "/dashboard" : "/my-projects");
+      setLocation(userRole === "Admin" ? "/dashboard" : "/user/dashboard");
     }
   }, [setLocation]);
 
@@ -57,7 +57,7 @@ const Auth = () => {
       localStorage.setItem("userId", String(user.id));
       localStorage.setItem("userName", user.name);
       localStorage.setItem("isAuthenticated", "true");
-      setLocation(user.role === "Admin" ? "/dashboard" : "/my-projects");
+      setLocation(user.role === "Admin" ? "/dashboard" : "/user/dashboard");
     },
     onError: (err: Error) => {
       setError(

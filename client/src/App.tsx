@@ -11,7 +11,9 @@ import ProjectBoard from "@/pages/ProjectBoard";
 import Tasks from "@/pages/Tasks";
 import Reports from "@/pages/Reports";
 import Auth from "@/pages/Auth";
-import MyProjects from "@/pages/MyProjects";
+import UserDashboard from "@/pages/UserDashboard";
+import UserProjects from "@/pages/UserProjects";
+import UserTasks from "@/pages/UserTasks";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 
@@ -59,10 +61,31 @@ function Router() {
       </Route>
 
       {/* Protected User Routes */}
-      <Route path="/my-projects">
+      <Route path="/user/dashboard">
         <ProtectedRoute role="User">
           <Layout>
-            <MyProjects />
+            <UserDashboard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/user/projects">
+        <ProtectedRoute role="User">
+          <Layout>
+            <UserProjects />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/user/projects/:id">
+        <ProtectedRoute role="User">
+          <Layout>
+            <ProjectBoard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/user/tasks">
+        <ProtectedRoute role="User">
+          <Layout>
+            <UserTasks />
           </Layout>
         </ProtectedRoute>
       </Route>

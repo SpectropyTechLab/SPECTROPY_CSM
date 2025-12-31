@@ -1,0 +1,100 @@
+# 📘 Prompt for Replit AI – SCR-006: User Dashboard, Projects, and Task Views
+
+## 🎯 Objective:
+Develop the **User-side dashboard** that allows logged-in standard users to:
+- View assigned projects
+- Access and interact with tasks
+- Update task status
+- See performance insights (optional)
+- Navigate via user-specific options (user avatar, logout, settings)
+
+## 🧱 Components Required:
+
+### 1. Layout
+- Use the same app shell layout:
+  - **Left Panel**: Navigation
+    - Dashboard
+    - My Projects
+    - My Tasks
+    - Settings
+    - Logout
+  - **Right Panel**: Main dynamic content
+
+---
+
+### 2. User Dashboard Page (`/user/dashboard`)
+- **Widgets**:
+  - Assigned Projects (as cards with name, status)
+  - Total Tasks, Completed Tasks, Pending Tasks
+  - Progress Chart (Pie/Bar chart using Chart.js or Recharts)
+- **Animations**:
+  - Smooth fade-in for cards
+  - Slide-up for statistics
+- **Data Source**:
+  - Fetch assigned projects and tasks from `/api/projects?userId={id}` and `/api/tasks?userId={id}`
+
+---
+
+### 3. My Projects Page (`/user/projects`)
+- **Grid View** of all assigned projects.
+- Each card clickable to navigate to Kanban board like:
+  `/user/projects/:projectId`
+- Card Includes:
+  - Project Name
+  - Status
+  - Progress Bar (Based on task completion)
+  - Created Date
+- **Filters**: By status (Active, Completed)
+
+---
+
+### 4. My Tasks Page (`/user/tasks`)
+- Tabular view of all tasks assigned to this user.
+- Columns:
+  - Title
+  - Bucket
+  - Priority
+  - Due Date
+  - Status (Can be updated by user)
+  - Estimated Time (Hours & Minutes)
+  - Start Date, End Date
+- **Status Dropdown**: Allow user to change from Todo ⟷ In Progress ⟷ Completed
+- **Editable Fields**: Only editable if not yet marked completed
+
+---
+
+### 5. User Top Bar (Global Component)
+- Top-right avatar with:
+  - Profile Settings
+  - Change Password
+  - Logout
+
+---
+
+### 6. Navigation Behavior
+- Ensure role-based routing: if `role=standard_user`, they only see `/user/*` routes.
+- Prevent access to `/admin/*` routes.
+
+---
+
+## 💡 Backend Updates:
+- Ensure APIs support user-specific queries:
+  - `/api/projects?userId=`
+  - `/api/tasks?userId=`
+- Update task schema to include:
+  - `startDate`, `endDate`
+  - `estimatedTimeHours`, `estimatedTimeMinutes`
+
+---
+
+## 🌐 Design Notes:
+- Light theme
+- Use modern design system (dev21)
+- All cards should have hover elevation, smooth load animations, and shadow borders
+- Ensure mobile responsiveness
+
+---
+
+## ✅ Expected Result:
+A fully functional **User Dashboard**, **Project Grid**, and **Task Table**, with interactive status updates and analytics.
+
