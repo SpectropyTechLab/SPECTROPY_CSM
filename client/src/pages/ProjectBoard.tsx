@@ -62,6 +62,8 @@ export default function ProjectBoard() {
   const [newTaskEstimateHours, setNewTaskEstimateHours] = useState(0);
   const [newTaskEstimateMinutes, setNewTaskEstimateMinutes] = useState(0);
   const [newBucketTitle, setNewBucketTitle] = useState("");
+  const [editingBucketId, setEditingBucketId] = useState<number | null>(null);
+  const [editingBucketTitle, setEditingBucketTitle] = useState("");
   const [editTaskTitle, setEditTaskTitle] = useState("");
   const [editTaskDescription, setEditTaskDescription] = useState("");
   const [editTaskPriority, setEditTaskPriority] = useState("medium");
@@ -129,6 +131,25 @@ export default function ProjectBoard() {
       setNewBucketTitle("");
     },
   });
+
+  const updateBucketMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Bucket> & { id: number }) => {
+      return apiRequest("PATCH", `/api/buckets/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/buckets", projectId] });
+      setEditingBucketId(null);
+      setEditingBucketTitle("");
+    },
+  });
+
+  const handleSaveBucketTitle = (bucketId: number) => {
+    if (!editingBucketTitle.trim()) {
+      setEditingBucketId(null);
+      return;
+    }
+    updateBucketMutation.mutate({ id: bucketId, title: editingBucketTitle });
+  };
 
   const bucketsWithTasks: BucketWithTasks[] = buckets.map((bucket) => ({
     ...bucket,
@@ -381,12 +402,35 @@ export default function ProjectBoard() {
             >
               <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-2">
-                  <h3
-                    className="font-medium"
-                    data-testid={`text-bucket-title-${bucket.id}`}
-                  >
-                    {bucket.title}
-                  </h3>
+                  {editingBucketId === bucket.id ? (
+                    <Input
+                      value={editingBucketTitle}
+                      onChange={(e) => setEditingBucketTitle(e.target.value)}
+                      onBlur={() => handleSaveBucketTitle(bucket.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleSaveBucketTitle(bucket.id);
+                        } else if (e.key === "Escape") {
+                          setEditingBucketId(null);
+                          setEditingBucketTitle("");
+                        }
+                      }}
+                      autoFocus
+                      className="h-7 w-40 text-sm font-medium"
+                      data-testid={`input-edit-bucket-title-${bucket.id}`}
+                    />
+                  ) : (
+                    <h3
+                      className="font-medium cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => {
+                        setEditingBucketId(bucket.id);
+                        setEditingBucketTitle(bucket.title);
+                      }}
+                      data-testid={`text-bucket-title-${bucket.id}`}
+                    >
+                      {bucket.title}
+                    </h3>
+                  )}
                   <Badge variant="secondary" className="text-xs">
                     {bucket.tasks.length}
                   </Badge>
