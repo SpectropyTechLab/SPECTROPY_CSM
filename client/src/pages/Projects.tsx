@@ -6,17 +6,25 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { FolderKanban, Plus, Eye, User, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { FolderKanban, Plus, Eye, User, CheckCircle2, Circle, Loader2, MoreVertical, Pencil, Archive, Type } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Project, Task, User as UserType } from "@shared/schema";
 
 const Projects = () => {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDescription, setNewProjectDescription] = useState("");
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
+  const [inlineTitle, setInlineTitle] = useState("");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -39,6 +47,29 @@ const Projects = () => {
       setIsCreateOpen(false);
       setNewProjectName("");
       setNewProjectDescription("");
+      toast({ title: "Project created", description: "Your new project has been created successfully." });
+    },
+  });
+
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<Project> & { id: number }) => {
+      return apiRequest("PATCH", `/api/projects/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      setEditingProject(null);
+      setEditingTitleId(null);
+      toast({ title: "Project updated", description: "Project has been updated successfully." });
+    },
+  });
+
+  const archiveProjectMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("PATCH", `/api/projects/${id}`, { status: "archived" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      toast({ title: "Project archived", description: "Project has been archived." });
     },
   });
 
@@ -49,6 +80,35 @@ const Projects = () => {
       description: newProjectDescription || null,
       status: "active",
     });
+  };
+
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setEditName(project.name);
+    setEditDescription(project.description || "");
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingProject || !editName.trim()) return;
+    updateProjectMutation.mutate({
+      id: editingProject.id,
+      name: editName,
+      description: editDescription || null,
+    });
+  };
+
+  const handleStartInlineEdit = (project: Project) => {
+    setEditingTitleId(project.id);
+    setInlineTitle(project.name);
+  };
+
+  const handleSaveInlineTitle = (projectId: number) => {
+    if (!inlineTitle.trim()) return;
+    updateProjectMutation.mutate({ id: projectId, name: inlineTitle });
+  };
+
+  const handleArchiveProject = (projectId: number) => {
+    archiveProjectMutation.mutate(projectId);
   };
 
   const getProjectTaskCount = (projectId: number) => {
@@ -165,23 +225,83 @@ const Projects = () => {
                       <Badge 
                         variant={isCompleted ? "default" : "secondary"} 
                         className={
-                          isCompleted 
-                            ? "bg-emerald-100 text-emerald-700 no-default-hover-elevate" 
-                            : "bg-blue-100 text-blue-700 no-default-hover-elevate"
+                          project.status === "archived"
+                            ? "bg-slate-100 text-slate-600 no-default-hover-elevate"
+                            : isCompleted 
+                              ? "bg-emerald-100 text-emerald-700 no-default-hover-elevate" 
+                              : "bg-blue-100 text-blue-700 no-default-hover-elevate"
                         }
                       >
-                        {isCompleted ? (
+                        {project.status === "archived" ? (
+                          <Archive className="w-3 h-3 mr-1" />
+                        ) : isCompleted ? (
                           <CheckCircle2 className="w-3 h-3 mr-1" />
                         ) : (
                           <Circle className="w-3 h-3 mr-1" />
                         )}
-                        {isCompleted ? "Completed" : "In Progress"}
+                        {project.status === "archived" ? "Archived" : isCompleted ? "Completed" : "In Progress"}
                       </Badge>
-                      <span className="text-xs font-medium text-slate-400">ID: #{project.id}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-project-menu-${project.id}`}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem
+                            onClick={() => handleEditProject(project)}
+                            data-testid={`menu-edit-project-${project.id}`}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Project
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStartInlineEdit(project)}
+                            data-testid={`menu-edit-title-${project.id}`}
+                          >
+                            <Type className="h-4 w-4 mr-2" />
+                            Edit Title
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleArchiveProject(project.id)}
+                            className="text-amber-600"
+                            data-testid={`menu-archive-project-${project.id}`}
+                          >
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archive Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <CardTitle className="text-xl font-bold text-slate-900 line-clamp-1" data-testid={`text-project-name-${project.id}`}>
-                      {project.name}
-                    </CardTitle>
+                    {editingTitleId === project.id ? (
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                          value={inlineTitle}
+                          onChange={(e) => setInlineTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveInlineTitle(project.id);
+                            if (e.key === "Escape") setEditingTitleId(null);
+                          }}
+                          className="text-lg font-bold"
+                          autoFocus
+                          data-testid={`input-inline-title-${project.id}`}
+                        />
+                        <Button size="sm" onClick={() => handleSaveInlineTitle(project.id)} data-testid={`button-save-title-${project.id}`}>
+                          Save
+                        </Button>
+                      </div>
+                    ) : (
+                      <CardTitle className="text-xl font-bold text-slate-900 line-clamp-1" data-testid={`text-project-name-${project.id}`}>
+                        {project.name}
+                      </CardTitle>
+                    )}
                     <CardDescription className="flex items-center gap-1.5 text-slate-500 text-sm">
                       <User className="w-3.5 h-3.5" />
                       {owner ? `Created by ${owner.name}` : "No owner assigned"}
@@ -219,6 +339,48 @@ const Projects = () => {
           })}
         </div>
       )}
+
+      {/* Edit Project Dialog */}
+      <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Project Name</label>
+              <Input
+                placeholder="Project name..."
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                data-testid="input-edit-project-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Description</label>
+              <Textarea
+                placeholder="Description (optional)..."
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                data-testid="input-edit-project-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingProject(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateProjectMutation.isPending}
+              data-testid="button-save-edit-project"
+            >
+              {updateProjectMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
