@@ -23,6 +23,7 @@ export const projects = pgTable("projects", {
   startDate: timestamp("start_date").defaultNow(),
   endDate: timestamp("end_date"),
   ownerId: integer("owner_id").references(() => users.id),
+  lastModifiedBy: integer("last_modified_by").references(() => users.id),
 });
 
 export const buckets = pgTable("buckets", {

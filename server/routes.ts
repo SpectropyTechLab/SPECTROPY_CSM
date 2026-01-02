@@ -5,18 +5,28 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
-const otpMap = new Map<string, { code: string; expires: number; verified: boolean }>();
+const otpMap = new Map<
+  string,
+  { code: string; expires: number; verified: boolean }
+>();
 const SALT_ROUNDS = 10;
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function getCurrentUserId(req: import("express").Request): number {
+  return 2;
+}
+
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
+async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
 
@@ -25,7 +35,7 @@ async function seedDatabase() {
   if (users.length === 0) {
     const adminHash = await hashPassword("admin123");
     const userHash = await hashPassword("user123");
-    
+
     const user = await storage.createUser({
       username: "admin",
       email: "admin@spectropy.com",
@@ -101,7 +111,7 @@ async function seedDatabase() {
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
 ): Promise<Server> {
   // Projects
   app.get(api.projects.list.path, async (req, res) => {
@@ -118,7 +128,14 @@ export async function registerRoutes(
   app.post(api.projects.create.path, async (req, res) => {
     try {
       const input = api.projects.create.input.parse(req.body);
-      const project = await storage.createProject(input);
+      const userId = getCurrentUserId(req);
+      
+      const project = await storage.createProject({
+        ...input,
+        ownerId: userId,
+        lastModifiedBy: userId,
+        startDate: new Date(),
+      });
       res.status(201).json(project);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -131,7 +148,13 @@ export async function registerRoutes(
   app.patch(api.projects.update.path, async (req, res) => {
     try {
       const input = api.projects.update.input.parse(req.body);
-      const project = await storage.updateProject(Number(req.params.id), input);
+      const userId = getCurrentUserId(req);
+
+      const project = await storage.updateProject(Number(req.params.id), {
+        ...input,
+        lastModifiedBy: userId,
+      });
+
       res.json(project);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -148,11 +171,15 @@ export async function registerRoutes(
 
   // Tasks
   app.get(api.tasks.list.path, async (req, res) => {
-    const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
-    const assigneeId = req.query.assigneeId ? Number(req.query.assigneeId) : undefined;
+    const projectId = req.query.projectId
+      ? Number(req.query.projectId)
+      : undefined;
+    const assigneeId = req.query.assigneeId
+      ? Number(req.query.assigneeId)
+      : undefined;
     let tasks = await storage.getTasks(projectId);
     if (assigneeId) {
-      tasks = tasks.filter(task => task.assigneeId === assigneeId);
+      tasks = tasks.filter((task) => task.assigneeId === assigneeId);
     }
     res.json(tasks);
   });
@@ -196,7 +223,9 @@ export async function registerRoutes(
 
   // Buckets
   app.get(api.buckets.list.path, async (req, res) => {
-    const projectId = req.query.projectId ? Number(req.query.projectId) : undefined;
+    const projectId = req.query.projectId
+      ? Number(req.query.projectId)
+      : undefined;
     if (projectId) {
       const buckets = await storage.getBuckets(projectId);
       res.json(buckets);
@@ -242,10 +271,10 @@ export async function registerRoutes(
     try {
       const { email } = api.auth.sendOtp.input.parse(req.body);
       const otp = generateOTP();
-      otpMap.set(email, { 
-        code: otp, 
+      otpMap.set(email, {
+        code: otp,
         expires: Date.now() + 5 * 60 * 1000,
-        verified: false 
+        verified: false,
       });
       console.log(`OTP for ${email}: ${otp}`);
       res.json({ message: "OTP sent successfully" });
@@ -261,7 +290,7 @@ export async function registerRoutes(
     try {
       const { email, otp } = api.auth.verifyOtp.input.parse(req.body);
       const stored = otpMap.get(email);
-      
+
       if (!stored) {
         return res.status(400).json({ message: "No OTP found for this email" });
       }
@@ -272,7 +301,7 @@ export async function registerRoutes(
       if (stored.code !== otp) {
         return res.status(400).json({ message: "Invalid OTP" });
       }
-      
+
       stored.verified = true;
       res.json({ verified: true });
     } catch (err) {
@@ -285,28 +314,30 @@ export async function registerRoutes(
 
   app.post(api.auth.register.path, async (req, res) => {
     try {
-      const { email, password, name, role } = api.auth.register.input.parse(req.body);
-      
+      const { email, password, name, role } = api.auth.register.input.parse(
+        req.body,
+      );
+
       const stored = otpMap.get(email);
       if (!stored || !stored.verified) {
         return res.status(400).json({ message: "Please verify OTP first" });
       }
-      
+
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(400).json({ message: "Email already registered" });
       }
-      
+
       const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
-        username: email.split('@')[0],
+        username: email.split("@")[0],
         email,
         password: hashedPassword,
         name,
         role: role || "User",
         otpVerified: true,
       });
-      
+
       otpMap.delete(email);
       const { password: _, ...safeUser } = user;
       res.status(201).json(safeUser);
@@ -321,17 +352,17 @@ export async function registerRoutes(
   app.post(api.auth.login.path, async (req, res) => {
     try {
       const { email, password } = api.auth.login.input.parse(req.body);
-      
+
       const user = await storage.getUserByEmail(email);
       if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
-      
+
       const isValid = await verifyPassword(password, user.password);
       if (!isValid) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
-      
+
       const { password: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
@@ -343,12 +374,12 @@ export async function registerRoutes(
   });
 
   // Reports API
-  app.get('/api/reports/summary', async (req, res) => {
+  app.get("/api/reports/summary", async (req, res) => {
     const projects = await storage.getProjects();
     const tasks = await storage.getTasks();
     const users = await storage.getUsers();
-    const activeUsers = users.filter(u => u.otpVerified);
-    
+    const activeUsers = users.filter((u) => u.otpVerified);
+
     res.json({
       totalProjects: projects.length,
       totalTasks: tasks.length,
@@ -356,56 +387,74 @@ export async function registerRoutes(
     });
   });
 
-  app.get('/api/reports/project-progress', async (req, res) => {
+  app.get("/api/reports/project-progress", async (req, res) => {
     const projects = await storage.getProjects();
     const tasks = await storage.getTasks();
-    
-    const projectProgress = projects.map(project => {
-      const projectTasks = tasks.filter(t => t.projectId === project.id);
-      const completed = projectTasks.filter(t => t.status === 'completed').length;
+
+    const projectProgress = projects.map((project) => {
+      const projectTasks = tasks.filter((t) => t.projectId === project.id);
+      const completed = projectTasks.filter(
+        (t) => t.status === "completed",
+      ).length;
       return {
         name: project.name,
         completed,
         total: projectTasks.length,
-        percentage: projectTasks.length > 0 ? Math.round((completed / projectTasks.length) * 100) : 0,
+        percentage:
+          projectTasks.length > 0
+            ? Math.round((completed / projectTasks.length) * 100)
+            : 0,
       };
     });
-    
+
     res.json(projectProgress);
   });
 
-  app.get('/api/reports/user-performance', async (req, res) => {
+  app.get("/api/reports/user-performance", async (req, res) => {
     const users = await storage.getUsers();
     const tasks = await storage.getTasks();
-    
-    const userPerformance = users.map(user => {
-      const userTasks = tasks.filter(t => t.assigneeId === user.id);
-      const completed = userTasks.filter(t => t.status === 'completed').length;
-      const totalEstimate = userTasks.reduce((acc, t) => acc + (t.estimateHours || 0) + (t.estimateMinutes || 0) / 60, 0);
-      const avgTime = userTasks.length > 0 ? totalEstimate / userTasks.length : 0;
-      return {
-        user: user.name,
-        userId: user.id,
-        completed,
-        total: userTasks.length,
-        avgTime: Math.round(avgTime * 10) / 10,
-      };
-    }).filter(u => u.total > 0);
-    
+
+    const userPerformance = users
+      .map((user) => {
+        const userTasks = tasks.filter((t) => t.assigneeId === user.id);
+        const completed = userTasks.filter(
+          (t) => t.status === "completed",
+        ).length;
+        const totalEstimate = userTasks.reduce(
+          (acc, t) =>
+            acc + (t.estimateHours || 0) + (t.estimateMinutes || 0) / 60,
+          0,
+        );
+        const avgTime =
+          userTasks.length > 0 ? totalEstimate / userTasks.length : 0;
+        return {
+          user: user.name,
+          userId: user.id,
+          completed,
+          total: userTasks.length,
+          avgTime: Math.round(avgTime * 10) / 10,
+        };
+      })
+      .filter((u) => u.total > 0);
+
     res.json(userPerformance);
   });
 
-  app.get('/api/reports/bucket-stats', async (req, res) => {
+  app.get("/api/reports/bucket-stats", async (req, res) => {
     const tasks = await storage.getTasks();
     const projects = await storage.getProjects();
-    
+
     const bucketStats: { bucket: string; count: number }[] = [];
-    
+
     for (const project of projects) {
       const buckets = await storage.getBuckets(project.id);
       for (const bucket of buckets) {
-        const existingBucket = bucketStats.find(b => b.bucket === bucket.title);
-        const bucketTaskCount = tasks.filter(t => t.bucketId === bucket.id).length;
+        const existingBucket = bucketStats.find(
+          (b) => b.bucket === bucket.title,
+        );
+        const bucketTaskCount = tasks.filter(
+          (t) => t.bucketId === bucket.id,
+        ).length;
         if (existingBucket) {
           existingBucket.count += bucketTaskCount;
         } else {
@@ -413,24 +462,27 @@ export async function registerRoutes(
         }
       }
     }
-    
+
     res.json(bucketStats);
   });
 
-  app.get('/api/reports/status-breakdown', async (req, res) => {
+  app.get("/api/reports/status-breakdown", async (req, res) => {
     const tasks = await storage.getTasks();
-    
+
     const statusMap: Record<string, number> = {};
-    tasks.forEach(task => {
-      const status = task.status || 'unknown';
+    tasks.forEach((task) => {
+      const status = task.status || "unknown";
       statusMap[status] = (statusMap[status] || 0) + 1;
     });
-    
-    const statusBreakdown = Object.entries(statusMap).map(([status, count]) => ({
-      status: status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' '),
-      count,
-    }));
-    
+
+    const statusBreakdown = Object.entries(statusMap).map(
+      ([status, count]) => ({
+        status:
+          status.charAt(0).toUpperCase() + status.slice(1).replace("_", " "),
+        count,
+      }),
+    );
+
     res.json(statusBreakdown);
   });
 
