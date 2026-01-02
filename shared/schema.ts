@@ -1,7 +1,26 @@
-import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
+
+export const checklistItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  completed: z.boolean(),
+});
+
+export const attachmentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  type: z.string(),
+  size: z.number(),
+  uploadedAt: z.string(),
+  uploadedBy: z.number().optional(),
+});
+
+export type ChecklistItem = z.infer<typeof checklistItemSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -42,9 +61,12 @@ export const tasks = pgTable("tasks", {
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   bucketId: integer("bucket_id").references(() => buckets.id, { onDelete: "set null" }),
   assigneeId: integer("assignee_id").references(() => users.id),
+  assignedUsers: integer("assigned_users").array().default([]),
   estimateHours: integer("estimate_hours").default(0),
   estimateMinutes: integer("estimate_minutes").default(0),
   history: text("history").array().default([]),
+  checklist: jsonb("checklist").$type<ChecklistItem[]>().default([]),
+  attachments: jsonb("attachments").$type<Attachment[]>().default([]),
   startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
   position: integer("position").notNull().default(0),
@@ -100,6 +122,9 @@ export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true })
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true }).extend({
   startDate: z.union([z.coerce.date(), z.null()]).optional(),
   dueDate: z.union([z.coerce.date(), z.null()]).optional(),
+  assignedUsers: z.array(z.number()).optional().default([]),
+  checklist: z.array(checklistItemSchema).optional().default([]),
+  attachments: z.array(attachmentSchema).optional().default([]),
 });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 
