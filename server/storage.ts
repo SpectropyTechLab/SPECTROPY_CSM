@@ -26,6 +26,7 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: number, updates: UpdateProjectRequest): Promise<Project>;
   deleteProject(id: number): Promise<void>;
+  cloneProject(id: number, newName: string, ownerId: number): Promise<Project>;
 
   // Buckets
   getBuckets(projectId: number): Promise<Bucket[]>;
@@ -97,6 +98,56 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProject(id: number): Promise<void> {
     await db.delete(projects).where(eq(projects.id, id));
+  }
+
+  async cloneProject(id: number, newName: string, ownerId: number): Promise<Project> {
+    const sourceProject = await this.getProject(id);
+    if (!sourceProject) {
+      throw new Error("Project not found");
+    }
+
+    const [newProject] = await db.insert(projects).values({
+      name: newName,
+      description: sourceProject.description,
+      status: "active",
+      startDate: new Date(),
+      ownerId: ownerId,
+      lastModifiedBy: ownerId,
+    }).returning();
+
+    const sourceBuckets = await this.getBuckets(id);
+    const bucketIdMap = new Map<number, number>();
+
+    for (const bucket of sourceBuckets) {
+      const [newBucket] = await db.insert(buckets).values({
+        title: bucket.title,
+        projectId: newProject.id,
+        position: bucket.position,
+      }).returning();
+      bucketIdMap.set(bucket.id, newBucket.id);
+    }
+
+    const sourceTasks = await this.getTasks(id);
+    for (const task of sourceTasks) {
+      const newBucketId = task.bucketId ? bucketIdMap.get(task.bucketId) : null;
+      await db.insert(tasks).values({
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        projectId: newProject.id,
+        bucketId: newBucketId || null,
+        assigneeId: task.assigneeId,
+        estimateHours: task.estimateHours,
+        estimateMinutes: task.estimateMinutes,
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+        position: task.position,
+        history: [`Cloned from "${sourceProject.name}" on ${new Date().toLocaleDateString()}`],
+      });
+    }
+
+    return newProject;
   }
 
   // Buckets

@@ -169,6 +169,27 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  app.post(api.projects.clone.path, async (req, res) => {
+    try {
+      const input = api.projects.clone.input.parse(req.body);
+      const userId = getCurrentUserId(req);
+      const project = await storage.cloneProject(
+        Number(req.params.id),
+        input.name,
+        userId
+      );
+      res.status(201).json(project);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      if (err instanceof Error && err.message === "Project not found") {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      throw err;
+    }
+  });
+
   // Tasks
   app.get(api.tasks.list.path, async (req, res) => {
     const projectId = req.query.projectId

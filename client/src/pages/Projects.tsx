@@ -20,6 +20,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -29,17 +30,25 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   FolderKanban,
   Plus,
   Eye,
   User,
-  CheckCircle2,
-  Circle,
   Loader2,
   MoreVertical,
   Pencil,
-  Archive,
-  Type,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState } from "react";
@@ -56,8 +65,9 @@ const Projects = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editingTitleId, setEditingTitleId] = useState<number | null>(null);
-  const [inlineTitle, setInlineTitle] = useState("");
+  const [cloningProject, setCloningProject] = useState<Project | null>(null);
+  const [cloneName, setCloneName] = useState("");
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -94,7 +104,6 @@ const Projects = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       setEditingProject(null);
-      setEditingTitleId(null);
       toast({
         title: "Project updated",
         description: "Project has been updated successfully.",
@@ -102,15 +111,49 @@ const Projects = () => {
     },
   });
 
-  const archiveProjectMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return apiRequest("PATCH", `/api/projects/${id}`, { status: "archived" });
+  const cloneProjectMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      return apiRequest("POST", `/api/projects/clone/${id}`, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buckets"] });
+      setCloningProject(null);
+      setCloneName("");
       toast({
-        title: "Project archived",
-        description: "Project has been archived.",
+        title: "Project cloned",
+        description: "Project has been cloned successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Clone failed",
+        description: "Failed to clone the project. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/projects/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buckets"] });
+      setDeletingProject(null);
+      toast({
+        title: "Project deleted",
+        description: "Project and all its tasks have been permanently deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete the project. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -139,18 +182,26 @@ const Projects = () => {
     });
   };
 
-  const handleStartInlineEdit = (project: Project) => {
-    setEditingTitleId(project.id);
-    setInlineTitle(project.name);
+  const handleCloneProject = (project: Project) => {
+    setCloningProject(project);
+    setCloneName(`${project.name} (Copy)`);
   };
 
-  const handleSaveInlineTitle = (projectId: number) => {
-    if (!inlineTitle.trim()) return;
-    updateProjectMutation.mutate({ id: projectId, name: inlineTitle });
+  const handleConfirmClone = () => {
+    if (!cloningProject || !cloneName.trim()) return;
+    cloneProjectMutation.mutate({
+      id: cloningProject.id,
+      name: cloneName,
+    });
   };
 
-  const handleArchiveProject = (projectId: number) => {
-    archiveProjectMutation.mutate(projectId);
+  const handleDeleteProject = (project: Project) => {
+    setDeletingProject(project);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingProject) return;
+    deleteProjectMutation.mutate(deletingProject.id);
   };
 
   const getProjectTaskCount = (projectId: number) => {
@@ -158,8 +209,9 @@ const Projects = () => {
   };
 
   const getProjectCompletedCount = (projectId: number) => {
-    return tasks.filter((t) => t.projectId === projectId && t.status === "done")
-      .length;
+    return tasks.filter(
+      (t) => t.projectId === projectId && t.status === "completed",
+    ).length;
   };
 
   const getProjectOwner = (ownerId: number | null) => {
@@ -256,102 +308,117 @@ const Projects = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => {
-            const getProjectTaskCount = (projectId: number) => {
-              return tasks.filter((t) => t.projectId === projectId).length;
-            };
-
-            const getProjectCompletedCount = (projectId: number) => {
-              return tasks.filter(
-                (t) => t.projectId === projectId && t.status === "done",
-              ).length;
-            };
-
-            const getProjectProgress = (projectId: number) => {
-              const total = getProjectTaskCount(projectId);
-              const completed = getProjectCompletedCount(projectId);
-              if (total === 0) return 0;
-              return Math.round((completed / total) * 100);
-            };
-
-            const getProjectOwner = (ownerId: number | null) => {
-              return users.find((u) => u.id === ownerId);
-            };
-
-            return (
-              <motion.div key={project.id}>
-                <Card className="hover-elevate bg-white border-slate-200 group overflow-visible cursor-pointer">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start gap-2 mb-2">
-                      <Badge variant="secondary">
-                        {getProjectTaskCount(project.id) === 0
-                          ? "Not Started"
+          {projects.map((project) => (
+            <motion.div key={project.id}>
+              <Card className="hover-elevate bg-white border-slate-200 group overflow-visible">
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <Badge
+                      className={
+                        getProjectTaskCount(project.id) === 0
+                          ? "bg-slate-200 text-slate-700"
                           : getProjectCompletedCount(project.id) ===
                               getProjectTaskCount(project.id)
-                            ? "Completed"
-                            : "In Progress"}
-                      </Badge>
-                      {/* Actions Dropdown remains same */}
-                    </div>
-
-                    <CardTitle className="text-xl font-bold text-slate-900 line-clamp-1">
-                      {project.name}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 text-slate-500 text-sm">
-                      <User className="w-3.5 h-3.5" />
-                      {getProjectOwner(project.ownerId)?.name || "Unknown"}
-                    </CardDescription>
-                  </CardHeader>
-
-                  <CardContent className="pb-6">
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-slate-500">Tasks</span>
-                      <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
-                        {getProjectTaskCount(project.id)} total
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${
-                          getProjectCompletedCount(project.id) ===
-                          getProjectTaskCount(project.id)
-                            ? "bg-emerald-500"
-                            : "bg-primary"
-                        }`}
-                        style={{
-                          width: `${getProjectProgress(project.id)}%`,
-                        }}
-                      />
-                    </div>
-                  </CardContent>
-
-                  <CardFooter className="pt-0 border-t border-slate-100 bg-slate-50/50 flex flex-col items-start gap-2">
-                    <Button
-                      variant="ghost"
-                      className="w-full text-primary hover:text-indigo-700 font-semibold py-4 transition-colors group"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/projects/${project.id}`);
-                      }}
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-indigo-100 text-indigo-700"
+                      }
                     >
-                      <Eye className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                      View Board
-                    </Button>
-                    <p className="text-xs text-slate-400 ml-2">
-                      Last modified by:{" "}
-                      <span className="font-medium">
-                        {getProjectOwner(project.ownerId)?.name || "Unknown"}
-                      </span>
-                    </p>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            );
-          })}
+                      {getProjectTaskCount(project.id) === 0
+                        ? "Not Started"
+                        : getProjectCompletedCount(project.id) ===
+                            getProjectTaskCount(project.id)
+                          ? "Completed"
+                          : "In Progress"}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`button-menu-project-${project.id}`}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleEditProject(project)}
+                          data-testid={`button-edit-project-${project.id}`}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit Project
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleCloneProject(project)}
+                          data-testid={`button-clone-project-${project.id}`}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          Clone Project
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteProject(project)}
+                          className="text-red-600 focus:text-red-600"
+                          data-testid={`button-delete-project-${project.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Project
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <CardTitle className="text-xl font-bold text-slate-900 line-clamp-1">
+                    {project.name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-1.5 text-slate-500 text-sm">
+                    <User className="w-3.5 h-3.5" />
+                    {getProjectOwner(project.ownerId)?.name || "Unknown"}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="pb-6">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-slate-500">Tasks</span>
+                    <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                      {getProjectTaskCount(project.id)} total
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        getProjectCompletedCount(project.id) ===
+                        getProjectTaskCount(project.id)
+                          ? "bg-emerald-500"
+                          : "bg-primary"
+                      }`}
+                      style={{
+                        width: `${getProjectProgress(project.id)}%`,
+                      }}
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter className="pt-0 border-t border-slate-100 bg-slate-50/50 flex flex-col items-start gap-2">
+                  <Button
+                    variant="ghost"
+                    className="w-full text-primary hover:text-indigo-700 font-semibold py-4 transition-colors group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/projects/${project.id}`);
+                    }}
+                    data-testid={`button-view-board-${project.id}`}
+                  >
+                    <Eye className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                    View Board
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       )}
 
-      {/* Edit Project Dialog */}
       <Dialog
         open={!!editingProject}
         onOpenChange={(open) => !open && setEditingProject(null)}
@@ -401,6 +468,80 @@ const Projects = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={!!cloningProject}
+        onOpenChange={(open) => !open && setCloningProject(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clone Project</DialogTitle>
+            <DialogDescription>
+              Create a copy of "{cloningProject?.name}" with all its buckets and
+              tasks.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">
+                New Project Name
+              </label>
+              <Input
+                placeholder="Enter name for cloned project..."
+                value={cloneName}
+                onChange={(e) => setCloneName(e.target.value)}
+                data-testid="input-clone-project-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloningProject(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmClone}
+              disabled={cloneProjectMutation.isPending || !cloneName.trim()}
+              data-testid="button-confirm-clone-project"
+            >
+              {cloneProjectMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Clone Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={!!deletingProject}
+        onOpenChange={(open) => !open && setDeletingProject(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingProject?.name}"? This
+              will permanently remove the project and all its tasks. This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-project">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+              data-testid="button-confirm-delete-project"
+            >
+              {deleteProjectMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

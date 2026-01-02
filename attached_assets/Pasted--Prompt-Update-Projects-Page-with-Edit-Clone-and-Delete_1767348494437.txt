@@ -1,0 +1,80 @@
+# Prompt: Update Projects Page with Edit, Clone, and Delete (SCR-007)
+# Context: SPECTROPY PMS – User/Admin Projects Page
+# Path: @client/src/pages/Projects.tsx
+# Goal: Add full project management actions for each project card
+# Tech Stack: React + Tailwind + Shadcn + Framer Motion + Dev21 Light Theme
+
+---
+
+## 🧱 Requirements:
+
+1. **Project Card Buttons**
+- Each project card must have three actions:
+  1. **Edit**
+     - Opens a modal/dialog
+     - Allows editing the **Project Name**
+     - Updates project via `/api/projects/:id` (PATCH)
+     - Should show success/failure message
+  2. **Clone**
+     - Opens a modal/dialog
+     - Ask for new project name
+     - Clone all project data (including buckets & tasks) into a new project
+     - Call API `/api/projects/clone/:id` (POST)
+     - Update UI to show the new project in grid view
+  3. **Delete**
+     - Opens a confirmation dialog
+     - Permanently deletes the project and all its associated tasks
+     - Must be **isolated**: project & tasks should **not appear in history or logs anywhere**
+     - Call API `/api/projects/:id` (DELETE)
+     - Update UI to remove the project card
+
+---
+
+## 🧠 Functional Instructions:
+
+- Fetch all projects as usual using `/api/projects`
+- Map over projects and render buttons on each card:
+  - Edit: opens inline modal
+  - Clone: opens modal for name input, duplicates project
+  - Delete: confirmation dialog → delete project & related tasks
+- Ensure **state updates** after each action (invalidate react-query cache or refresh data)
+- Handle errors and show toast notifications
+
+---
+
+## 💻 Backend Instructions:
+
+- Edit project API: `PATCH /api/projects/:id` → update name
+- Clone project API: `POST /api/projects/clone/:id` → duplicate project structure and tasks
+- Delete project API: `DELETE /api/projects/:id` → remove project and all related tasks
+- Ensure deleted project/tasks do **not appear in history/logs**
+- Optional: flag `isDeleted` or hard delete based on future audit log plan
+
+---
+
+## 🎨 Design:
+
+- Use **Dev21 buttons** with icons (Edit: Pencil, Clone: Copy, Delete: Trash)
+- Confirm dialogs should be visually distinct
+- Hover & click animations for each action button
+- Responsive grid layout for projects
+- Show updated project list immediately after actions
+
+---
+
+## 📁 File Structure:
+
+- `/src/pages/Projects.tsx` → updated project cards with buttons
+- `/src/components/projects/EditProjectDialog.tsx`
+- `/src/components/projects/CloneProjectDialog.tsx`
+- `/src/components/projects/DeleteProjectDialog.tsx`
+
+---
+
+## ✅ Expected Result:
+
+- Project cards now have **Edit, Clone, Delete** actions
+- Edit updates the name inline
+- Clone duplicates the project with new name
+- Delete permanently removes project and tasks from UI and prevents appearance in logs/history
+- Smooth UI animations and Dev21 styling

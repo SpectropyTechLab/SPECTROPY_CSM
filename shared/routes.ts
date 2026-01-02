@@ -57,6 +57,18 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    clone: {
+      method: 'POST' as const,
+      path: '/api/projects/clone/:id',
+      input: z.object({
+        name: z.string().min(1),
+      }),
+      responses: {
+        201: z.custom<typeof projects.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
   },
   tasks: {
     list: {
