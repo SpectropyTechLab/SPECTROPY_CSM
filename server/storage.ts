@@ -1,10 +1,11 @@
 import { db } from "./db";
 import {
-  users, projects, tasks, buckets,
+  users, projects, tasks, buckets, notifications,
   type User, type InsertUser,
   type Project, type InsertProject,
   type Bucket, type InsertBucket,
   type Task, type InsertTask,
+  type Notification, type InsertNotification,
   type UpdateProjectRequest,
   type UpdateBucketRequest,
   type UpdateTaskRequest
@@ -43,6 +44,10 @@ export interface IStorage {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: number, updates: UpdateTaskRequest): Promise<Task>;
   deleteTask(id: number): Promise<void>;
+
+  // Notifications
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getNotifications(userId: number): Promise<Notification[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -187,6 +192,16 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTask(id: number): Promise<void> {
     await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  // Notifications
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    const [notification] = await db.insert(notifications).values(insertNotification).returning();
+    return notification;
+  }
+
+  async getNotifications(userId: number): Promise<Notification[]> {
+    return await db.select().from(notifications).where(eq(notifications.userId, userId));
   }
 }
 

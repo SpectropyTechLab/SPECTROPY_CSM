@@ -4,6 +4,12 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import {
+  sendEmail,
+  createTaskAssignmentEmail,
+  createTaskCompletionEmail,
+  createTaskUpdateEmail,
+} from "./emailService";
 
 const otpMap = new Map<
   string,
@@ -209,6 +215,31 @@ export async function registerRoutes(
     try {
       const input = api.tasks.create.input.parse(req.body);
       const task = await storage.createTask(input);
+
+      if (task.assigneeId) {
+        const assignee = await storage.getUser(task.assigneeId);
+        const project = await storage.getProject(task.projectId);
+        const currentUser = await storage.getUser(getCurrentUserId(req));
+
+        if (assignee?.email && project) {
+          const { subject, html } = createTaskAssignmentEmail({
+            taskTitle: task.title,
+            taskDescription: task.description || undefined,
+            projectName: project.name,
+            assignedBy: currentUser?.name || "System",
+            dueDate: task.dueDate,
+          });
+
+          const sent = await sendEmail({ to: assignee.email, subject, html });
+          await storage.createNotification({
+            taskId: task.id,
+            userId: assignee.id,
+            type: "assignment",
+            status: sent ? "sent" : "failed",
+          });
+        }
+      }
+
       res.status(201).json(task);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -221,7 +252,83 @@ export async function registerRoutes(
   app.patch(api.tasks.update.path, async (req, res) => {
     try {
       const input = api.tasks.update.input.parse(req.body);
+      const existingTask = await storage.getTask(Number(req.params.id));
       const task = await storage.updateTask(Number(req.params.id), input);
+      const project = await storage.getProject(task.projectId);
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+
+      if (project) {
+        const isCompletion = input.status === "completed" && existingTask?.status !== "completed";
+        const isNewAssignment = input.assigneeId && input.assigneeId !== existingTask?.assigneeId;
+
+        if (isCompletion && project.ownerId) {
+          const projectOwner = await storage.getUser(project.ownerId);
+          const assignee = task.assigneeId ? await storage.getUser(task.assigneeId) : null;
+
+          if (projectOwner?.email) {
+            const { subject, html } = createTaskCompletionEmail({
+              taskTitle: task.title,
+              projectName: project.name,
+              assigneeName: assignee?.name || "Unknown",
+            });
+
+            const sent = await sendEmail({ to: projectOwner.email, subject, html });
+            await storage.createNotification({
+              taskId: task.id,
+              userId: projectOwner.id,
+              type: "completion",
+              status: sent ? "sent" : "failed",
+            });
+          }
+        } else if (isNewAssignment && task.assigneeId) {
+          const assignee = await storage.getUser(task.assigneeId);
+
+          if (assignee?.email) {
+            const { subject, html } = createTaskAssignmentEmail({
+              taskTitle: task.title,
+              taskDescription: task.description || undefined,
+              projectName: project.name,
+              assignedBy: currentUser?.name || "System",
+              dueDate: task.dueDate,
+            });
+
+            const sent = await sendEmail({ to: assignee.email, subject, html });
+            await storage.createNotification({
+              taskId: task.id,
+              userId: assignee.id,
+              type: "assignment",
+              status: sent ? "sent" : "failed",
+            });
+          }
+        } else if (Object.keys(input).length > 0) {
+          const recipientIds = new Set<number>();
+          if (task.assigneeId) recipientIds.add(task.assigneeId);
+          if (project.ownerId) recipientIds.add(project.ownerId);
+
+          for (const userId of Array.from(recipientIds)) {
+            const user = await storage.getUser(userId);
+            if (user?.email) {
+              const modificationType = Object.keys(input).join(", ");
+              const { subject, html } = createTaskUpdateEmail({
+                taskTitle: task.title,
+                projectName: project.name,
+                modifiedBy: currentUser?.name || "System",
+                modificationType,
+                status: task.status,
+              });
+
+              const sent = await sendEmail({ to: user.email, subject, html });
+              await storage.createNotification({
+                taskId: task.id,
+                userId: user.id,
+                type: "update",
+                status: sent ? "sent" : "failed",
+              });
+            }
+          }
+        }
+      }
+
       res.json(task);
     } catch (err) {
       if (err instanceof z.ZodError) {

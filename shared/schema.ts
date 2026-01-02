@@ -51,6 +51,15 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  status: text("status").notNull().default("sent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const projectsRelations = relations(projects, ({ many, one }) => ({
   tasks: many(tasks),
@@ -92,6 +101,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, creat
   startDate: z.union([z.coerce.date(), z.null()]).optional(),
   dueDate: z.union([z.coerce.date(), z.null()]).optional(),
 });
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -102,6 +112,8 @@ export type Bucket = typeof buckets.$inferSelect;
 export type InsertBucket = z.infer<typeof insertBucketSchema>;
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // API Types
 export type CreateProjectRequest = InsertProject;
