@@ -1,0 +1,45 @@
+Role: Senior Full Stack Developer & System Architect
+Project: SPECTROPY PMS (Project Management System)
+Environment: Replit (React + Node.js + PostgreSQL)
+Objective: Add Gmail-based email notification system for task-related events
+
+Requirements:
+
+1. Backend Integration:
+   - Install and use Nodemailer.
+   - Configure Gmail SMTP using environment variables:
+     - GMAIL_USER (your Gmail email)
+     - GMAIL_APP_PASS (App Password for Gmail account)
+   - Create a service function `sendEmail({ to, subject, html })` that sends an email using Nodemailer.
+   - Trigger email notifications on the following events:
+     a) Task Assignment → send email to assigned user with task details.
+     b) Task Completion → send email to project creator/admin notifying task completion.
+     c) Task Update/Modification → send email to assigned user and admin notifying changes.
+   - Ensure all emails are HTML formatted and include task title, description, project name, assignee, due date, and status.
+
+2. Frontend Integration:
+   - On task creation, update, or status change, call the backend API that sends email notifications.
+   - Ensure task forms and modals remain user-friendly and show success/failure messages for email notifications.
+
+3. Database:
+   - Add a `notifications` table (optional for history) with fields: id, taskId, userId (recipient), type (assignment/completion/update), status (sent/failed), timestamp.
+   - Ensure every email event logs a record in this table.
+
+4. Security:
+   - Store Gmail credentials in `.env` file and **never hardcode** in frontend or backend.
+   - Use proper error handling to log failures if email cannot be sent.
+
+5. Testing:
+   - On dev environment, ensure Gmail App Password is used.
+   - Display console logs for each sent email with recipient address and status.
+
+6. User Experience:
+   - Display toast notifications or inline alerts in the PMS UI when emails are successfully sent.
+   - Keep all task CRUD functionality intact while adding email notifications.
+
+Instruction for AI:
+- Update backend Node.js routes to trigger emails on task assignment, completion, and updates.
+- Update frontend React components for task forms and modals to reflect email notifications.
+- Update database schema as needed.
+- Maintain dark/light theme settings already in PMS.
+- Provide all necessary code placement, component structure, and detailed instructions on integration points.
