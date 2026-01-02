@@ -18,6 +18,10 @@ interface TaskNotificationData {
   modificationType?: string;
 }
 
+// Debug: Log credential status on startup
+console.log(`Email service: GMAIL_USER is ${process.env.GMAIL_USER ? 'SET (' + process.env.GMAIL_USER + ')' : 'NOT SET'}`);
+console.log(`Email service: GMAIL_APP_PASS is ${process.env.GMAIL_APP_PASS ? 'SET (' + process.env.GMAIL_APP_PASS.length + ' chars)' : 'NOT SET'}`);
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
