@@ -7,9 +7,16 @@ import {
   LogOut,
   BarChart3,
   User,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Sidebar() {
   const [location] = useLocation();
@@ -91,34 +98,50 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 mt-auto border-t border-slate-100 bg-slate-50/50">
-        <div className="flex items-center gap-3 px-4 py-3 mb-2">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={userAvatar || undefined} />
-            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {userName.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-slate-900 truncate max-w-[120px]">
-              {userName}
-            </span>
-            <span className="text-xs text-slate-400">{userRole}</span>
-          </div>
-        </div>
-        <Link href="/settings">
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 cursor-pointer transition-colors">
-            <Settings className="w-5 h-5" />
-            <span className="font-medium">Settings</span>
-          </div>
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 cursor-pointer transition-colors mt-1"
-          data-testid="button-logout"
-        >
-          <LogOut className="w-5 h-5" />
-          <span className="font-medium">Logout</span>
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors"
+              data-testid="button-user-menu"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={userAvatar || undefined} />
+                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                  {userName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col flex-1 text-left">
+                <span className="text-sm font-medium text-slate-900 truncate max-w-[120px]">
+                  {userName}
+                </span>
+                <span className="text-xs text-slate-400">{userRole}</span>
+              </div>
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuItem asChild className="cursor-pointer" data-testid="menu-item-account">
+              <Link href="/account">
+                <User className="w-4 h-4 mr-2" />
+                Account
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild className="cursor-pointer" data-testid="menu-item-settings">
+              <Link href="/settings">
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer text-red-500 focus:text-red-500"
+              onClick={handleLogout}
+              data-testid="menu-item-logout"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );

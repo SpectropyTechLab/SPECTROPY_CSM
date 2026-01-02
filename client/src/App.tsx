@@ -14,6 +14,8 @@ import Auth from "@/pages/Auth";
 import UserDashboard from "@/pages/UserDashboard";
 import UserProjects from "@/pages/UserProjects";
 import UserTasks from "@/pages/UserTasks";
+import Account from "@/pages/Account";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 
@@ -86,6 +88,22 @@ function Router() {
         <ProtectedRoute role="User">
           <Layout>
             <UserTasks />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Shared Account and Settings Routes */}
+      <Route path="/account">
+        <ProtectedRoute>
+          <Layout>
+            <Account />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute>
+          <Layout>
+            <Settings />
           </Layout>
         </ProtectedRoute>
       </Route>

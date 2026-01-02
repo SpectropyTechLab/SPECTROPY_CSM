@@ -349,6 +349,25 @@ export async function registerRoutes(
     res.json(users);
   });
 
+  app.patch("/api/users/:id", async (req, res) => {
+    try {
+      const updateSchema = z.object({
+        name: z.string().optional(),
+        email: z.string().email().optional(),
+        title: z.string().optional(),
+        avatar: z.string().url().or(z.string().length(0)).optional(),
+      });
+      const input = updateSchema.parse(req.body);
+      const user = await storage.updateUser(Number(req.params.id), input);
+      res.json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
   // Buckets
   app.get(api.buckets.list.path, async (req, res) => {
     const projectId = req.query.projectId
