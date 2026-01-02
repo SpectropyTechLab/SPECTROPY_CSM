@@ -10,6 +10,8 @@ import {
   createTaskCompletionEmail,
   createTaskUpdateEmail,
 } from "./emailService";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { checklistItemSchema, attachmentSchema } from "@shared/schema";
 
 const otpMap = new Map<
   string,
@@ -662,6 +664,164 @@ export async function registerRoutes(
     );
 
     res.json(statusBreakdown);
+  });
+
+  // Register Object Storage routes
+  registerObjectStorageRoutes(app);
+
+  // Task checklist endpoints
+  app.post("/api/tasks/:id/checklist", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const input = checklistItemSchema.parse(req.body);
+      const checklist = [...(task.checklist || []), input];
+      const history = [...(task.history || []), `Checklist item added: "${input.title}" on ${new Date().toLocaleDateString()}`];
+      
+      const updatedTask = await storage.updateTask(taskId, { checklist, history });
+      res.json(updatedTask);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.patch("/api/tasks/:id/checklist/:itemId", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const itemId = req.params.itemId;
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const { completed, title } = req.body;
+      const checklist = (task.checklist || []).map(item => 
+        item.id === itemId ? { ...item, ...(completed !== undefined ? { completed } : {}), ...(title !== undefined ? { title } : {}) } : item
+      );
+      
+      const historyEntry = completed !== undefined 
+        ? `Checklist item "${title || 'item'}" marked as ${completed ? 'completed' : 'incomplete'} on ${new Date().toLocaleDateString()}`
+        : `Checklist item updated on ${new Date().toLocaleDateString()}`;
+      const history = [...(task.history || []), historyEntry];
+      
+      const updatedTask = await storage.updateTask(taskId, { checklist, history });
+      res.json(updatedTask);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update checklist item" });
+    }
+  });
+
+  app.delete("/api/tasks/:id/checklist/:itemId", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const itemId = req.params.itemId;
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const removedItem = (task.checklist || []).find(item => item.id === itemId);
+      const checklist = (task.checklist || []).filter(item => item.id !== itemId);
+      const history = [...(task.history || []), `Checklist item removed: "${removedItem?.title || 'item'}" on ${new Date().toLocaleDateString()}`];
+      
+      const updatedTask = await storage.updateTask(taskId, { checklist, history });
+      res.json(updatedTask);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete checklist item" });
+    }
+  });
+
+  // Task attachments endpoints
+  app.post("/api/tasks/:id/attachments", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const input = attachmentSchema.parse(req.body);
+      
+      // Validate file size (10MB limit)
+      if (input.size > 10 * 1024 * 1024) {
+        return res.status(400).json({ message: "File size exceeds 10MB limit" });
+      }
+      
+      const attachments = [...(task.attachments || []), input];
+      const history = [...(task.history || []), `Attachment added: "${input.name}" on ${new Date().toLocaleDateString()}`];
+      
+      const updatedTask = await storage.updateTask(taskId, { attachments, history });
+      res.json(updatedTask);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
+  app.delete("/api/tasks/:id/attachments/:attachmentId", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const attachmentId = req.params.attachmentId;
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      const removedAttachment = (task.attachments || []).find(att => att.id === attachmentId);
+      const attachments = (task.attachments || []).filter(att => att.id !== attachmentId);
+      const history = [...(task.history || []), `Attachment removed: "${removedAttachment?.name || 'file'}" on ${new Date().toLocaleDateString()}`];
+      
+      const updatedTask = await storage.updateTask(taskId, { attachments, history });
+      res.json(updatedTask);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete attachment" });
+    }
+  });
+
+  // Auto-progress task to next bucket on completion
+  app.post("/api/tasks/:id/complete-and-progress", async (req, res) => {
+    try {
+      const taskId = Number(req.params.id);
+      const task = await storage.getTask(taskId);
+      if (!task) return res.status(404).json({ message: "Task not found" });
+
+      // Mark current task as completed
+      const history = [...(task.history || []), `Marked as completed on ${new Date().toLocaleDateString()}`];
+      await storage.updateTask(taskId, { status: "completed", history });
+
+      // Find next bucket
+      if (task.bucketId) {
+        const buckets = await storage.getBuckets(task.projectId);
+        const currentBucketIndex = buckets.findIndex(b => b.id === task.bucketId);
+        
+        if (currentBucketIndex >= 0 && currentBucketIndex < buckets.length - 1) {
+          const nextBucket = buckets[currentBucketIndex + 1];
+          
+          // Create new task in next bucket with empty dates
+          const newTask = await storage.createTask({
+            title: task.title,
+            description: task.description,
+            status: "todo",
+            priority: task.priority,
+            projectId: task.projectId,
+            bucketId: nextBucket.id,
+            assigneeId: task.assigneeId,
+            assignedUsers: task.assignedUsers || [],
+            estimateHours: 0,
+            estimateMinutes: 0,
+            position: 0,
+            history: [`Created from completed task on ${new Date().toLocaleDateString()}`],
+            checklist: [],
+            attachments: [],
+          });
+          
+          return res.json({ completedTask: task, newTask });
+        }
+      }
+      
+      res.json({ completedTask: task, newTask: null });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to progress task" });
+    }
   });
 
   // Seed data
