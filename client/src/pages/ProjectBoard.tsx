@@ -55,7 +55,7 @@ import {
   Users,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Project, Bucket, Task, User, ChecklistItem, Attachment } from "@shared/schema";
+import type { Project, Bucket, Task, User, ChecklistItem, Attachment, HistoryEntry } from "@shared/schema";
 import { motion } from "framer-motion";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -67,6 +67,16 @@ export default function ProjectBoard() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const projectId = Number(id);
+
+  const currentUserId = Number(localStorage.getItem("userId")) || null;
+  const currentUserName = localStorage.getItem("userName") || "Unknown";
+
+  const createHistoryEntry = (action: string): HistoryEntry => ({
+    action,
+    userId: currentUserId,
+    userName: currentUserName,
+    timestamp: new Date().toISOString(),
+  });
 
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
@@ -234,7 +244,7 @@ export default function ProjectBoard() {
       position: targetPosition,
       history: [
         ...(draggedTask.history || []),
-        `Moved to ${buckets.find((b) => b.id === bucketId)?.title} on ${new Date().toLocaleDateString()}`,
+        createHistoryEntry(`Moved to ${buckets.find((b) => b.id === bucketId)?.title}`),
       ],
     });
     setDraggedTask(null);
@@ -260,7 +270,7 @@ export default function ProjectBoard() {
       dueDate: newTaskEndDate ? new Date(newTaskEndDate + "T12:00:00") : null,
       estimateHours: newTaskEstimateHours,
       estimateMinutes: newTaskEstimateMinutes,
-      history: [`Created on ${new Date().toLocaleDateString()}`],
+      history: [createHistoryEntry("Created")],
       checklist: [],
       attachments: [],
     });
@@ -320,7 +330,7 @@ export default function ProjectBoard() {
       attachments: editTaskAttachments,
       history: [
         ...(editingTask.history || []),
-        `Updated on ${new Date().toLocaleDateString()}`,
+        createHistoryEntry("Updated"),
       ],
     });
     setIsEditTaskOpen(false);
@@ -347,7 +357,7 @@ export default function ProjectBoard() {
       status: completed ? "completed" : "todo",
       history: [
         ...(task.history || []),
-        `${completed ? "Marked as completed" : "Marked as incomplete"} on ${new Date().toLocaleDateString()}`,
+        createHistoryEntry(completed ? "Marked as completed" : "Marked as incomplete"),
       ],
     });
   };
@@ -1098,7 +1108,7 @@ export default function ProjectBoard() {
 
       {/* Task History Dialog */}
       <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
@@ -1108,15 +1118,43 @@ export default function ProjectBoard() {
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 py-4">
               {historyTask?.history && historyTask.history.length > 0 ? (
-                historyTask.history.map((entry, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
-                  >
-                    <div className="h-2 w-2 mt-2 rounded-full bg-primary flex-shrink-0" />
-                    <p className="text-sm">{entry}</p>
-                  </div>
-                ))
+                [...historyTask.history].reverse().map((entry, index) => {
+                  const isStructured = typeof entry === "object" && entry !== null && "action" in entry;
+                  const historyEntry = isStructured ? entry as HistoryEntry : null;
+                  const legacyEntry = !isStructured ? String(entry) : null;
+
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="h-2 w-2 mt-2 rounded-full bg-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {historyEntry ? (
+                          <>
+                            <p className="text-sm font-medium">{historyEntry.action}</p>
+                            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <UserIcon className="h-3 w-3" />
+                                {historyEntry.userName || "Unknown"}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(historyEntry.timestamp).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(historyEntry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-sm">{legacyEntry}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               ) : (
                 <p className="text-sm text-muted-foreground text-center">No history available</p>
               )}

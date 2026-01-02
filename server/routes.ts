@@ -102,7 +102,12 @@ async function seedDatabase() {
       assignedUsers: [user.id],
       dueDate: new Date(Date.now() + 86400000 * 3),
       position: 0,
-      history: [`Created on ${new Date().toLocaleDateString()}`],
+      history: [{
+        action: "Created",
+        userId: user.id,
+        userName: user.name,
+        timestamp: new Date().toISOString(),
+      }],
       checklist: [],
       attachments: [],
     });
@@ -116,7 +121,12 @@ async function seedDatabase() {
       bucketId: bucket1.id,
       assignedUsers: [],
       position: 0,
-      history: [`Created on ${new Date().toLocaleDateString()}`],
+      history: [{
+        action: "Created",
+        userId: user.id,
+        userName: user.name,
+        timestamp: new Date().toISOString(),
+      }],
       checklist: [],
       attachments: [],
     });

@@ -19,8 +19,19 @@ export const attachmentSchema = z.object({
   uploadedBy: z.number().optional(),
 });
 
+export const historyEntrySchema = z.object({
+  action: z.string(),
+  userId: z.number().nullable(),
+  userName: z.string().nullable(),
+  timestamp: z.string(),
+});
+
+export const historyItemSchema = z.union([z.string(), historyEntrySchema]);
+
 export type ChecklistItem = z.infer<typeof checklistItemSchema>;
 export type Attachment = z.infer<typeof attachmentSchema>;
+export type HistoryEntry = z.infer<typeof historyEntrySchema>;
+export type HistoryItem = z.infer<typeof historyItemSchema>;
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -64,7 +75,7 @@ export const tasks = pgTable("tasks", {
   assignedUsers: integer("assigned_users").array().default([]),
   estimateHours: integer("estimate_hours").default(0),
   estimateMinutes: integer("estimate_minutes").default(0),
-  history: text("history").array().default([]),
+  history: jsonb("history").$type<HistoryItem[]>().default([]),
   checklist: jsonb("checklist").$type<ChecklistItem[]>().default([]),
   attachments: jsonb("attachments").$type<Attachment[]>().default([]),
   startDate: timestamp("start_date"),
@@ -125,6 +136,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, creat
   assignedUsers: z.array(z.number()).optional().default([]),
   checklist: z.array(checklistItemSchema).optional().default([]),
   attachments: z.array(attachmentSchema).optional().default([]),
+  history: z.array(historyItemSchema).optional().default([]),
 });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 
