@@ -99,9 +99,12 @@ async function seedDatabase() {
       projectId: project.id,
       bucketId: bucket2.id,
       assigneeId: user.id,
+      assignedUsers: [user.id],
       dueDate: new Date(Date.now() + 86400000 * 3),
       position: 0,
       history: [`Created on ${new Date().toLocaleDateString()}`],
+      checklist: [],
+      attachments: [],
     });
 
     await storage.createTask({
@@ -111,8 +114,11 @@ async function seedDatabase() {
       priority: "medium",
       projectId: project.id,
       bucketId: bucket1.id,
+      assignedUsers: [],
       position: 0,
       history: [`Created on ${new Date().toLocaleDateString()}`],
+      checklist: [],
+      attachments: [],
     });
   }
 }
