@@ -32,6 +32,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft,
@@ -53,6 +58,7 @@ import {
   Image,
   File,
   Users,
+  ChevronDown,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Project, Bucket, Task, User, ChecklistItem, Attachment, HistoryEntry } from "@shared/schema";
@@ -803,19 +809,35 @@ export default function ProjectBoard() {
                 <Users className="h-4 w-4 inline mr-2" />
                 Assign Users
               </label>
-              <div className="flex flex-wrap gap-2">
-                {users.map((user) => (
-                  <Badge
-                    key={user.id}
-                    variant={newTaskAssignees.includes(user.id) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}
-                  >
-                    {user.name}
-                    {newTaskAssignees.includes(user.id) && <X className="h-3 w-3 ml-1" />}
-                  </Badge>
-                ))}
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between" data-testid="button-assign-users-new">
+                    <span className="truncate">
+                      {newTaskAssignees.length === 0
+                        ? "Select users..."
+                        : `${newTaskAssignees.length} user${newTaskAssignees.length > 1 ? "s" : ""} selected`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2" align="start">
+                  <div className="space-y-1">
+                    {users.map((user) => (
+                      <div
+                        key={user.id}
+                        className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
+                        onClick={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}
+                      >
+                        <Checkbox
+                          checked={newTaskAssignees.includes(user.id)}
+                          onCheckedChange={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}
+                        />
+                        <span className="text-sm">{user.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -936,19 +958,35 @@ export default function ProjectBoard() {
                   <Users className="h-4 w-4 inline mr-2" />
                   Assign Users
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {users.map((user) => (
-                    <Badge
-                      key={user.id}
-                      variant={editTaskAssignees.includes(user.id) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}
-                    >
-                      {user.name}
-                      {editTaskAssignees.includes(user.id) && <X className="h-3 w-3 ml-1" />}
-                    </Badge>
-                  ))}
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between" data-testid="button-assign-users-edit">
+                      <span className="truncate">
+                        {editTaskAssignees.length === 0
+                          ? "Select users..."
+                          : `${editTaskAssignees.length} user${editTaskAssignees.length > 1 ? "s" : ""} selected`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="space-y-1">
+                      {users.map((user) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
+                          onClick={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}
+                        >
+                          <Checkbox
+                            checked={editTaskAssignees.includes(user.id)}
+                            onCheckedChange={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}
+                          />
+                          <span className="text-sm">{user.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
