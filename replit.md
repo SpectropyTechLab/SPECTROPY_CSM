@@ -55,6 +55,19 @@ Preferred communication style: Simple, everyday language.
 - **Storage Abstraction**: IStorage interface in storage.ts allows for easy testing and potential storage backend changes
 - **Component Library**: Using shadcn/ui provides accessible, customizable components without heavy dependencies
 
+## Email Notifications
+
+The application uses Gmail SMTP with Nodemailer for email notifications:
+- **GMAIL_USER**: Gmail email address (stored as secret)
+- **GMAIL_APP_PASS**: Gmail App Password for authentication (stored as secret)
+
+Email notifications are triggered for:
+- Task assignment (sent to assigned user)
+- Task completion (sent to project owner/admin)
+- Task updates (sent to assignee and project owner)
+
+The notification history is stored in the `notifications` table with status tracking.
+
 ## External Dependencies
 
 ### Database
