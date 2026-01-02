@@ -135,7 +135,7 @@ export async function registerRoutes(
     try {
       const input = api.projects.create.input.parse(req.body);
       const userId = getCurrentUserId(req);
-      
+
       const project = await storage.createProject({
         ...input,
         ownerId: userId,
@@ -182,7 +182,7 @@ export async function registerRoutes(
       const project = await storage.cloneProject(
         Number(req.params.id),
         input.name,
-        userId
+        userId,
       );
       res.status(201).json(project);
     } catch (err) {
@@ -258,12 +258,16 @@ export async function registerRoutes(
       const currentUser = await storage.getUser(getCurrentUserId(req));
 
       if (project) {
-        const isCompletion = input.status === "completed" && existingTask?.status !== "completed";
-        const isNewAssignment = input.assigneeId && input.assigneeId !== existingTask?.assigneeId;
+        const isCompletion =
+          input.status === "completed" && existingTask?.status !== "completed";
+        const isNewAssignment =
+          input.assigneeId && input.assigneeId !== existingTask?.assigneeId;
 
         if (isCompletion && project.ownerId) {
           const projectOwner = await storage.getUser(project.ownerId);
-          const assignee = task.assigneeId ? await storage.getUser(task.assigneeId) : null;
+          const assignee = task.assigneeId
+            ? await storage.getUser(task.assigneeId)
+            : null;
 
           if (projectOwner?.email) {
             const { subject, html } = createTaskCompletionEmail({
@@ -272,7 +276,11 @@ export async function registerRoutes(
               assigneeName: assignee?.name || "Unknown",
             });
 
-            const sent = await sendEmail({ to: projectOwner.email, subject, html });
+            const sent = await sendEmail({
+              to: projectOwner.email,
+              subject,
+              html,
+            });
             await storage.createNotification({
               taskId: task.id,
               userId: projectOwner.id,
@@ -423,6 +431,29 @@ export async function registerRoutes(
         expires: Date.now() + 5 * 60 * 1000,
         verified: false,
       });
+
+      // --- NEW CODE START ---
+      const emailSubject = "Your Verification Code - SPECTROPY";
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333;">Verification Request</h2>
+          <p>Please use the following code to verify your identity:</p>
+          <div style="background-color: #f4f4f5; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+            <h1 style="color: #4F46E5; letter-spacing: 5px; margin: 0;">${otp}</h1>
+          </div>
+          <p style="color: #666; font-size: 14px;">This code will expire in 5 minutes.</p>
+        </div>
+      `;
+
+      const sent = await sendEmail({
+        to: email,
+        subject: emailSubject,
+        html: emailHtml,
+      });
+
+      if (!sent) {
+        throw new Error("Failed to send email via transport service");
+      }
       console.log(`OTP for ${email}: ${otp}`);
       res.json({ message: "OTP sent successfully" });
     } catch (err) {
