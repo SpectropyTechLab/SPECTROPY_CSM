@@ -118,34 +118,12 @@ export class DatabaseStorage implements IStorage {
     }).returning();
 
     const sourceBuckets = await this.getBuckets(id);
-    const bucketIdMap = new Map<number, number>();
 
     for (const bucket of sourceBuckets) {
-      const [newBucket] = await db.insert(buckets).values({
+      await db.insert(buckets).values({
         title: bucket.title,
         projectId: newProject.id,
         position: bucket.position,
-      }).returning();
-      bucketIdMap.set(bucket.id, newBucket.id);
-    }
-
-    const sourceTasks = await this.getTasks(id);
-    for (const task of sourceTasks) {
-      const newBucketId = task.bucketId ? bucketIdMap.get(task.bucketId) : null;
-      await db.insert(tasks).values({
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        projectId: newProject.id,
-        bucketId: newBucketId || null,
-        assigneeId: task.assigneeId,
-        estimateHours: task.estimateHours,
-        estimateMinutes: task.estimateMinutes,
-        startDate: task.startDate,
-        dueDate: task.dueDate,
-        position: task.position,
-        history: [`Cloned from "${sourceProject.name}" on ${new Date().toLocaleDateString()}`],
       });
     }
 
