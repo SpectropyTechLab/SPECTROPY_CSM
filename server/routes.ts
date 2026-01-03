@@ -264,7 +264,11 @@ export async function registerRoutes(
       }
       
       const input = api.tasks.create.input.parse(req.body);
-      const task = await storage.createTask(input);
+      const userId = getCurrentUserId(req);
+      const task = await storage.createTask({
+        ...input,
+        creatorId: userId,
+      });
 
       if (task.assigneeId) {
         const assignee = await storage.getUser(task.assigneeId);
@@ -336,30 +340,37 @@ export async function registerRoutes(
         const isNewAssignment =
           input.assigneeId && input.assigneeId !== existingTask?.assigneeId;
 
-        if (isCompletion && project.ownerId) {
-          const projectOwner = await storage.getUser(project.ownerId);
+        if (isCompletion) {
+          const projectOwner = project.ownerId ? await storage.getUser(project.ownerId) : null;
+          const taskCreator = task.creatorId ? await storage.getUser(task.creatorId) : null;
           const assignee = task.assigneeId
             ? await storage.getUser(task.assigneeId)
             : null;
 
-          if (projectOwner?.email) {
-            const { subject, html } = createTaskCompletionEmail({
-              taskTitle: task.title,
-              projectName: project.name,
-              assigneeName: assignee?.name || "Unknown",
-            });
+          const recipients = new Map<number, User>();
+          if (projectOwner) recipients.set(projectOwner.id, projectOwner);
+          if (taskCreator) recipients.set(taskCreator.id, taskCreator);
 
-            const sent = await sendEmail({
-              to: projectOwner.email,
-              subject,
-              html,
-            });
-            await storage.createNotification({
-              taskId: task.id,
-              userId: projectOwner.id,
-              type: "completion",
-              status: sent ? "sent" : "failed",
-            });
+          for (const recipient of recipients.values()) {
+            if (recipient.email) {
+              const { subject, html } = createTaskCompletionEmail({
+                taskTitle: task.title,
+                projectName: project.name,
+                assigneeName: assignee?.name || "Unknown",
+              });
+
+              const sent = await sendEmail({
+                to: recipient.email,
+                subject,
+                html,
+              });
+              await storage.createNotification({
+                taskId: task.id,
+                userId: recipient.id,
+                type: "completion",
+                status: sent ? "sent" : "failed",
+              });
+            }
           }
         } else if (isNewAssignment && task.assigneeId) {
           const assignee = await storage.getUser(task.assigneeId);

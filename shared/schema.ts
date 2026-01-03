@@ -97,6 +97,7 @@ export const tasks = pgTable("tasks", {
   startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
   position: integer("position").notNull().default(0),
+  creatorId: integer("creator_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
