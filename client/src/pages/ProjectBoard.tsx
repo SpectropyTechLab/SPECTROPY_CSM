@@ -584,21 +584,22 @@ export default function ProjectBoard() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between gap-4 p-4 border-b bg-white dark:bg-slate-900">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 border-b bg-white dark:bg-slate-900">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/projects")}
             data-testid="button-back-to-projects"
+            className="flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-semibold" data-testid="text-project-name">
+          <div className="min-w-0">
+            <h1 className="text-lg md:text-xl font-semibold truncate" data-testid="text-project-name">
               {project.name}
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs md:text-sm text-muted-foreground truncate">
               {project.description || "No description"}
             </p>
           </div>
@@ -606,7 +607,7 @@ export default function ProjectBoard() {
 
         <Dialog open={isNewBucketOpen} onOpenChange={setIsNewBucketOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" data-testid="button-add-bucket">
+            <Button variant="outline" className="w-full sm:w-auto" data-testid="button-add-bucket">
               <Plus className="h-4 w-4 mr-2" />
               Add Bucket
             </Button>
@@ -639,14 +640,14 @@ export default function ProjectBoard() {
         </Dialog>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-4">
-        <div className="flex gap-4 h-full" style={{ minWidth: "max-content" }}>
+      <div className="flex-1 overflow-x-auto p-2 md:p-4">
+        <div className="flex gap-3 md:gap-4 h-full pb-4" style={{ minWidth: "max-content" }}>
           {bucketsWithTasks.map((bucket) => (
             <motion.div
               key={bucket.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+              className="flex flex-col w-72 md:w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex-shrink-0"
               data-testid={`bucket-column-${bucket.id}`}
             >
               <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
@@ -919,11 +920,11 @@ export default function ProjectBoard() {
 
       {/* New Task Dialog */}
       <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-[95vw] sm:w-full max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Add New Task</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-4 py-4 flex-1 overflow-y-auto">
             <Input
               placeholder="Task title..."
               value={newTaskTitle}
@@ -1054,11 +1055,11 @@ export default function ProjectBoard() {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditTaskOpen} onOpenChange={setIsEditTaskOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh]">
+        <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
+          <ScrollArea className="flex-1 max-h-[65vh]">
             <div className="space-y-4 py-4 pr-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
