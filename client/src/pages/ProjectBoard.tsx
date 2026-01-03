@@ -356,8 +356,9 @@ export default function ProjectBoard() {
     setIsHistoryOpen(true);
   };
 
-  const handleToggleTaskComplete = (task: Task, completed: boolean, e: React.MouseEvent) => {
+  const handleToggleTaskComplete = async (task: Task, completed: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
+    
     updateTaskMutation.mutate({
       id: task.id,
       status: completed ? "completed" : "todo",
@@ -366,6 +367,32 @@ export default function ProjectBoard() {
         createHistoryEntry(completed ? "Marked as completed" : "Marked as incomplete"),
       ],
     });
+
+    if (completed && buckets) {
+      const currentBucketIndex = buckets.findIndex((b) => b.id === task.bucketId);
+      const nextBucket = buckets[currentBucketIndex + 1];
+      
+      if (nextBucket) {
+        const newTaskData = {
+          title: task.title,
+          description: task.description || "",
+          priority: task.priority,
+          projectId: task.projectId,
+          bucketId: nextBucket.id,
+          assigneeId: task.assigneeId,
+          assignedUsers: task.assignedUsers || [],
+          startDate: task.startDate,
+          dueDate: task.dueDate,
+          estimateHours: task.estimateHours || 0,
+          estimateMinutes: task.estimateMinutes || 0,
+          checklist: [],
+          attachments: [],
+          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.name || "previous bucket"}`)],
+        };
+        
+        createTaskMutation.mutate(newTaskData);
+      }
+    }
   };
 
   const handleAddChecklistItem = () => {
