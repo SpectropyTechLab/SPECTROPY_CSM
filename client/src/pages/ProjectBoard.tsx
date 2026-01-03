@@ -741,6 +741,15 @@ export default function ProjectBoard() {
                         }`}
                       >
                         <div className="flex items-start gap-2">
+                          <Checkbox
+                            checked={task.status === "completed"}
+                            onCheckedChange={(checked) => {
+                              handleStatusChange(task, checked ? "completed" : "todo");
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1 flex-shrink-0"
+                            data-testid={`checkbox-task-${task.id}`}
+                          />
                           <div className="flex-1 min-w-0" onClick={() => handleOpenEditTask(task)}>
                             <div className="flex items-start justify-between gap-2">
                               <p
