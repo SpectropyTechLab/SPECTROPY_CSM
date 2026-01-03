@@ -639,14 +639,14 @@ export default function ProjectBoard() {
         </Dialog>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-4">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-4">
         <div className="flex gap-4 h-full" style={{ minWidth: "max-content" }}>
           {bucketsWithTasks.map((bucket) => (
             <motion.div
               key={bucket.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+              className="flex flex-col w-80 h-full max-h-full bg-slate-50 dark:bg-slate-800/50 rounded-lg"
               data-testid={`bucket-column-${bucket.id}`}
             >
               <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
@@ -703,7 +703,7 @@ export default function ProjectBoard() {
               </div>
 
               <div
-                className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
+                className="flex-1 p-2 space-y-2 overflow-y-auto"
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
@@ -905,7 +905,7 @@ export default function ProjectBoard() {
           ))}
 
           <div
-            className="flex items-center justify-center w-80 min-h-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
+            className="flex items-center justify-center w-80 h-full border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
             onClick={() => setIsNewBucketOpen(true)}
             data-testid="button-add-new-bucket"
           >
