@@ -1,0 +1,174 @@
+Role: Senior Full Stack Developer & System Architect  
+Project: SPECTROPY PMS  
+Feature: Role & Permission Management (Fix User Task Update Errors)  
+
+---
+
+## 🎯 PROBLEM STATEMENT
+
+Currently:
+- User-side task completion/update is failing
+- This is due to **permission conflicts**
+- There is no clear separation between:
+  - User permissions
+  - Admin permissions
+
+We need a **proper permission system** where:
+- All users register as **Standard Users by default**
+- Only Admin can:
+  - Grant / revoke permissions
+  - Promote users to Admin
+- Task actions depend on **explicit permissions**, not role alone
+
+---
+
+## 🧩 REQUIRED ACCESS MODEL
+
+### 1️⃣ ROLES (HIGH LEVEL)
+Only two roles exist:
+- `ADMIN`
+- `USER` (default on registration)
+
+> Role defines **scope**
+> Permissions define **actions**
+
+---
+
+### 2️⃣ PERMISSIONS (ACTION LEVEL)
+
+Create a permissions system with the following flags:
+
+| Permission Key | Meaning |
+|---------------|--------|
+| CREATE_TASK | Can create tasks |
+| UPDATE_TASK | Can edit task details |
+| COMPLETE_TASK | Can mark task as completed |
+| DELETE_TASK | Can delete tasks |
+| CREATE_PROJECT | Can create projects |
+| UPDATE_PROJECT | Can edit projects |
+| DELETE_PROJECT | Can delete projects |
+| MANAGE_USERS | Can assign permissions / promote users |
+
+Admin has **all permissions by default**.
+
+User has **NO permissions by default**, except:
+- VIEW assigned tasks
+- VIEW assigned projects
+
+---
+
+## 🧠 REGISTRATION RULE (VERY IMPORTANT)
+
+- On registration:
+  - role = `USER`
+  - permissions = empty
+- There must be **NO auto-admin**
+- Admin manually grants permissions later
+
+---
+
+## 🗂️ DATABASE CHANGES
+
+### Update `users` table:
+Add:
+- `role` (enum: ADMIN | USER)
+- `permissions` (JSON or TEXT array)
+
+Example:
+```json
+["CREATE_TASK", "UPDATE_TASK", "COMPLETE_TASK"]
+```
+
+---
+
+## 🧠 BACKEND LOGIC (CRITICAL)
+
+### Middleware: Permission Guard
+Create middleware:
+```
+checkPermission("PERMISSION_NAME")
+```
+
+This middleware should:
+- Read user from session/token
+- If role === ADMIN → allow
+- If USER → check permissions array
+- Else → return 403 Forbidden
+
+---
+
+### Apply Permission Guards To APIs
+
+| API | Required Permission |
+|---|---|
+| POST /api/tasks | CREATE_TASK |
+| PATCH /api/tasks/:id | UPDATE_TASK |
+| PATCH /api/tasks/:id/complete | COMPLETE_TASK |
+| DELETE /api/tasks/:id | DELETE_TASK |
+| POST /api/projects | CREATE_PROJECT |
+| PATCH /api/projects/:id | UPDATE_PROJECT |
+| DELETE /api/projects/:id | DELETE_PROJECT |
+| POST /api/admin/permissions | MANAGE_USERS |
+
+---
+
+## 🧑‍💼 ADMIN PERMISSION MANAGEMENT PANEL
+
+### New Admin Screen:
+```
+/admin/user-permissions
+```
+
+Admin should be able to:
+- View all users
+- Toggle permissions using checkboxes
+- Promote / demote Admin
+- Save permission changes
+
+This panel is **Admin-only**.
+
+---
+
+## 🖥️ FRONTEND BEHAVIOR CHANGES
+
+### User Side:
+- If user lacks permission:
+  - Disable buttons (Create / Edit / Complete)
+  - Show tooltip: "Permission required"
+- User should never see Admin-only screens
+
+### Admin Side:
+- Full access always
+- Can override any permission
+
+---
+
+## 🔐 SECURITY RULES (NON-NEGOTIABLE)
+
+- Permission checks MUST happen in backend
+- Frontend disabling is UX only
+- Never trust frontend alone
+- Permission changes must be logged in history
+
+---
+
+## 🧪 BUG FIX RESULT EXPECTED
+
+After implementation:
+- Users with COMPLETE_TASK permission can complete tasks
+- Users without permission see disabled UI
+- No more random errors on task completion
+- Clear, predictable access control
+
+---
+
+## ✅ FINAL OUTCOME
+
+- Clean RBAC + Permission model
+- Admin controls all access
+- User dashboard works without errors
+- System scales safely in future
+
+---
+
+Proceed step-by-step and confirm once permissions system is stable.

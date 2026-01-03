@@ -33,6 +33,19 @@ export type Attachment = z.infer<typeof attachmentSchema>;
 export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 export type HistoryItem = z.infer<typeof historyItemSchema>;
 
+export const PERMISSIONS = [
+  "CREATE_TASK",
+  "UPDATE_TASK",
+  "COMPLETE_TASK",
+  "DELETE_TASK",
+  "CREATE_PROJECT",
+  "UPDATE_PROJECT",
+  "DELETE_PROJECT",
+  "MANAGE_USERS",
+] as const;
+
+export type Permission = typeof PERMISSIONS[number];
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -42,6 +55,7 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   title: text("title"),
   role: text("role").notNull().default("User"),
+  permissions: jsonb("permissions").$type<Permission[]>().default([]),
   otpVerified: boolean("otp_verified").default(false),
 });
 
@@ -127,7 +141,9 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
 }));
 
 // Schemas
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true }).extend({
+  permissions: z.array(z.enum(PERMISSIONS)).optional().default([]),
+});
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
 export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true }).extend({

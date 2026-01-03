@@ -387,7 +387,7 @@ export default function ProjectBoard() {
           estimateMinutes: task.estimateMinutes || 0,
           checklist: [],
           attachments: [],
-          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.name || "previous bucket"}`)],
+          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`)],
         };
         
         createTaskMutation.mutate(newTaskData);
