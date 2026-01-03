@@ -111,7 +111,7 @@ export default function ProjectBoard() {
   const [editTaskDescription, setEditTaskDescription] = useState("");
   const [editTaskPriority, setEditTaskPriority] = useState("medium");
   const [editTaskAssignees, setEditTaskAssignees] = useState<number[]>([]);
-  const [editTaskCompleted, setEditTaskCompleted] = useState(false);
+  const [editTaskStatus, setEditTaskStatus] = useState("todo");
   const [editTaskStartDate, setEditTaskStartDate] = useState("");
   const [editTaskEndDate, setEditTaskEndDate] = useState("");
   const [editTaskEstimateHours, setEditTaskEstimateHours] = useState(0);
@@ -307,7 +307,7 @@ export default function ProjectBoard() {
     setEditTaskDescription(task.description || "");
     setEditTaskPriority(task.priority);
     setEditTaskAssignees(task.assignedUsers || (task.assigneeId ? [task.assigneeId] : []));
-    setEditTaskCompleted(task.status === "completed");
+    setEditTaskStatus(task.status || "todo");
     setEditTaskStartDate(
       task.startDate ? new Date(task.startDate).toISOString().split("T")[0] : ""
     );
@@ -331,11 +331,7 @@ export default function ProjectBoard() {
       priority: editTaskPriority,
       assigneeId: editTaskAssignees[0] || null,
       assignedUsers: editTaskAssignees,
-      status: editTaskCompleted
-        ? "completed"
-        : editingTask.status === "completed"
-          ? "todo"
-          : editingTask.status,
+      status: editTaskStatus,
       startDate: editTaskStartDate ? new Date(editTaskStartDate + "T12:00:00") : null,
       dueDate: editTaskEndDate ? new Date(editTaskEndDate + "T12:00:00") : null,
       estimateHours: editTaskEstimateHours,
@@ -372,6 +368,76 @@ export default function ProjectBoard() {
     if (!currentUserId) return false;
     return task.assigneeId === currentUserId || 
            Boolean(task.assignedUsers && task.assignedUsers.includes(currentUserId));
+  };
+
+  const handleStatusChange = async (task: Task, newStatus: string) => {
+    const isCompletion = newStatus === "completed";
+    const canComplete = canCompleteTask || isAssignedToTask(task);
+    
+    if (isCompletion && !canComplete) {
+      toast({ title: "Permission denied", description: "You do not have permission to mark tasks as complete", variant: "destructive" });
+      return;
+    }
+    
+    if (!canUpdateTask && !canComplete) {
+      toast({ title: "Permission denied", description: "You do not have permission to update task status", variant: "destructive" });
+      return;
+    }
+
+    const statusLabel = newStatus === "todo" ? "Not Started" : newStatus === "in_progress" ? "In Progress" : "Completed";
+    
+    updateTaskMutation.mutate({
+      id: task.id,
+      status: newStatus,
+      history: [
+        ...(task.history || []),
+        createHistoryEntry(`Status changed to ${statusLabel}`),
+      ],
+    });
+
+    if (newStatus === "completed" && buckets) {
+      const currentBucketIndex = buckets.findIndex((b) => b.id === task.bucketId);
+      const nextBucket = buckets[currentBucketIndex + 1];
+      
+      if (nextBucket) {
+        const newTaskData = {
+          title: task.title,
+          description: task.description || "",
+          priority: task.priority,
+          projectId: task.projectId,
+          bucketId: nextBucket.id,
+          assigneeId: task.assigneeId,
+          assignedUsers: task.assignedUsers || [],
+          startDate: task.startDate,
+          dueDate: task.dueDate,
+          estimateHours: task.estimateHours || 0,
+          estimateMinutes: task.estimateMinutes || 0,
+          checklist: [],
+          attachments: [],
+          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`)],
+        };
+        
+        createTaskMutation.mutate(newTaskData);
+      }
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "todo": return "Not Started";
+      case "in_progress": return "In Progress";
+      case "completed": return "Completed";
+      default: return "Not Started";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "todo": return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+      case "in_progress": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "completed": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+      default: return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+    }
   };
 
   const handleToggleTaskComplete = async (task: Task, completed: boolean, e: React.MouseEvent) => {
@@ -675,19 +741,6 @@ export default function ProjectBoard() {
                         }`}
                       >
                         <div className="flex items-start gap-2">
-                          <div
-                            className="flex-shrink-0 mt-0.5"
-                            onClick={(e) =>
-                              handleToggleTaskComplete(task, task.status !== "completed", e)
-                            }
-                          >
-                            <Checkbox
-                              checked={task.status === "completed"}
-                              className="h-4 w-4"
-                              data-testid={`checkbox-task-${task.id}`}
-                            />
-                          </div>
-
                           <div className="flex-1 min-w-0" onClick={() => handleOpenEditTask(task)}>
                             <div className="flex items-start justify-between gap-2">
                               <p
@@ -734,21 +787,46 @@ export default function ProjectBoard() {
                             )}
 
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs cursor-pointer ${getStatusColor(task.status)}`}
+                                    data-testid={`badge-status-${task.id}`}
+                                  >
+                                    {task.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                                    {task.status === "in_progress" && <Clock className="h-3 w-3 mr-1" />}
+                                    {getStatusLabel(task.status)}
+                                    <ChevronDown className="h-3 w-3 ml-1" />
+                                  </Badge>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "todo"); }}
+                                    className={task.status === "todo" ? "bg-accent" : ""}
+                                  >
+                                    Not Started
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "in_progress"); }}
+                                    className={task.status === "in_progress" ? "bg-accent" : ""}
+                                  >
+                                    In Progress
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "completed"); }}
+                                    className={task.status === "completed" ? "bg-accent" : ""}
+                                  >
+                                    Completed
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               <Badge
                                 variant="secondary"
                                 className={`text-xs ${getPriorityColor(task.priority)}`}
                               >
                                 {task.priority}
                               </Badge>
-                              {task.status === "completed" && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Done
-                                </Badge>
-                              )}
                               {(task.estimateHours || task.estimateMinutes) && (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
@@ -973,16 +1051,20 @@ export default function ProjectBoard() {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-4 py-4 pr-4">
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="edit-task-completed"
-                  checked={editTaskCompleted}
-                  onCheckedChange={(checked) => setEditTaskCompleted(checked === true)}
-                  data-testid="checkbox-edit-task-completed"
-                />
-                <label htmlFor="edit-task-completed" className="text-sm font-medium cursor-pointer">
-                  Mark as completed
+              <div>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Status
                 </label>
+                <Select value={editTaskStatus} onValueChange={setEditTaskStatus}>
+                  <SelectTrigger data-testid="select-edit-task-status">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">Not Started</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <Input
