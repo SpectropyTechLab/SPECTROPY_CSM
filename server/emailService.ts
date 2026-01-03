@@ -18,27 +18,30 @@ interface TaskNotificationData {
   modificationType?: string;
 }
 
-// Debug: Log credential status on startup
-console.log(`Email service: GMAIL_USER is ${process.env.GMAIL_USER ? 'SET (' + process.env.GMAIL_USER + ')' : 'NOT SET'}`);
-console.log(`Email service: GMAIL_APP_PASS is ${process.env.GMAIL_APP_PASS ? 'SET (' + process.env.GMAIL_APP_PASS.length + ' chars)' : 'NOT SET'}`);
+// Note: The secrets are swapped - GMAIL_USER contains app password, GMAIL_APP_PASS contains email
+const gmailUser = process.env.GMAIL_APP_PASS; // Actually the email address
+const gmailPass = process.env.GMAIL_USER;     // Actually the app password
+
+console.log(`Email service: GMAIL_USER is ${gmailUser ? 'SET (' + gmailUser + ')' : 'NOT SET'}`);
+console.log(`Email service: GMAIL_APP_PASS is ${gmailPass ? 'SET (' + gmailPass.length + ' chars)' : 'NOT SET'}`);
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASS,
+    user: gmailUser,
+    pass: gmailPass,
   },
 });
 
 export async function sendEmail({ to, subject, html }: EmailOptions): Promise<boolean> {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASS) {
+  if (!gmailUser || !gmailPass) {
     console.log("Email credentials not configured. Skipping email notification.");
     return false;
   }
 
   try {
     const info = await transporter.sendMail({
-      from: `"Spectropy PMS" <${process.env.GMAIL_USER}>`,
+      from: `"Spectropy PMS" <${gmailUser}>`,
       to,
       subject,
       html,
