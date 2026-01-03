@@ -208,9 +208,9 @@ export default function UserTasks() {
             ) : (
               <>
                 {/* Mobile Card View */}
-                <div className="md:hidden space-y-3 p-4">
+                <div className="md:hidden divide-y divide-slate-200">
                   {filteredTasks.map((task) => (
-                    <Card key={task.id} className="p-4" data-testid={`card-task-${task.id}`}>
+                    <div key={task.id} className="p-4" data-testid={`card-task-${task.id}`}>
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           {task.status === "completed" && (
@@ -232,8 +232,8 @@ export default function UserTasks() {
                       )}
                       
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-3">
-                        <span className="bg-slate-100 px-2 py-1 rounded">{getProjectName(task.projectId)}</span>
-                        <span className="bg-slate-100 px-2 py-1 rounded">{getBucketName(task.bucketId)}</span>
+                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{getProjectName(task.projectId)}</span>
+                        <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">{getBucketName(task.bucketId)}</span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {task.estimateHours || 0}h {task.estimateMinutes || 0}m
@@ -269,7 +269,7 @@ export default function UserTasks() {
                           </div>
                         )}
                       </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
 
