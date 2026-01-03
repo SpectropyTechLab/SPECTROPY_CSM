@@ -57,6 +57,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("User"),
   permissions: jsonb("permissions").$type<Permission[]>().default([]),
   otpVerified: boolean("otp_verified").default(false),
+  passwordResetOtp: text("password_reset_otp"),
+  passwordResetExpires: timestamp("password_reset_expires"),
 });
 
 export const projects = pgTable("projects", {

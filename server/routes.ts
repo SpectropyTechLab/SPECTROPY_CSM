@@ -526,6 +526,42 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/users/current", async (req, res) => {
+    const user = await storage.getUser(getCurrentUserId(req));
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, otp, newPassword } = z.object({
+        email: z.string().email(),
+        otp: z.string().length(6),
+        newPassword: z.string().min(6),
+      }).parse(req.body);
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const stored = otpMap.get(email);
+      if (!stored || stored.code !== otp || Date.now() > stored.expires) {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { password: hashedPassword });
+      
+      otpMap.delete(email);
+      res.json({ message: "Password reset successfully" });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      throw err;
+    }
+  });
+
   // Buckets
   app.get(api.buckets.list.path, async (req, res) => {
     const projectId = req.query.projectId

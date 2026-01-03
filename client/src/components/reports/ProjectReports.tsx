@@ -32,7 +32,14 @@ import {
 } from "lucide-react";
 import type { Project, Task } from "@shared/schema";
 
-const COLORS = ["#4f46e5", "#22d3ee", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+const COLORS = [
+  "#4f46e5",
+  "#22d3ee",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+];
 
 interface ProjectReportsProps {
   selectedProjectId: string;
@@ -51,23 +58,36 @@ export default function ProjectReports({
     queryKey: ["/api/tasks"],
   });
 
-  const { data: buckets = [] } = useQuery<{ id: number; name: string; projectId: number }[]>({
+  const { data: buckets = [] } = useQuery<
+    { id: number; title: string; name: string; projectId: number }[]
+  >({
     queryKey: ["/api/buckets"],
   });
 
-  const selectedProject = projects.find((p) => String(p.id) === selectedProjectId);
-  const projectTasks = tasks.filter((t) => String(t.projectId) === selectedProjectId);
-  const projectBuckets = buckets.filter((b) => Number(b.projectId) === Number(selectedProjectId));
+  const selectedProject = projects.find(
+    (p) => String(p.id) === selectedProjectId,
+  );
+  const projectTasks = tasks.filter(
+    (t) => String(t.projectId) === selectedProjectId,
+  );
+  const projectBuckets = buckets.filter(
+    (b) => Number(b.projectId) === Number(selectedProjectId),
+  );
 
   const totalTasks = projectTasks.length;
-  const completedTasks = projectTasks.filter((t) => t.status === "completed").length;
-  const pendingTasks = projectTasks.filter((t) => t.status !== "completed").length;
+  const completedTasks = projectTasks.filter(
+    (t) => t.status === "completed",
+  ).length;
+  const pendingTasks = projectTasks.filter(
+    (t) => t.status !== "completed",
+  ).length;
   const overdueTasks = projectTasks.filter((t) => {
     if (!t.dueDate || t.status === "completed") return false;
     return new Date(t.dueDate) < new Date();
   }).length;
 
-  const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const completionPercentage =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const estimatedMinutes = projectTasks.reduce((sum, t) => {
     return sum + (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
@@ -76,14 +96,22 @@ export default function ProjectReports({
 
   const bucketDistribution = projectBuckets
     .map((bucket) => ({
-      name: bucket.name || "Unnamed",
-      count: projectTasks.filter((t) => Number(t.bucketId) === Number(bucket.id)).length,
+      name: bucket.title || "Unnamed",
+      count: projectTasks.filter(
+        (t) => Number(t.bucketId) === Number(bucket.id),
+      ).length,
     }))
     .filter((b) => b.count > 0);
 
   const statusData = [
-    { status: "Not Started", count: projectTasks.filter((t) => t.status === "todo").length },
-    { status: "In Progress", count: projectTasks.filter((t) => t.status === "in_progress").length },
+    {
+      status: "Not Started",
+      count: projectTasks.filter((t) => t.status === "todo").length,
+    },
+    {
+      status: "In Progress",
+      count: projectTasks.filter((t) => t.status === "in_progress").length,
+    },
     { status: "Completed", count: completedTasks },
   ];
 
@@ -93,9 +121,14 @@ export default function ProjectReports({
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Select Project</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Select Project
+              </label>
               <Select value={selectedProjectId} onValueChange={onProjectChange}>
-                <SelectTrigger className="w-full max-w-xs" data-testid="select-project-report">
+                <SelectTrigger
+                  className="w-full max-w-xs"
+                  data-testid="select-project-report"
+                >
                   <SelectValue placeholder="Choose a project..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -121,9 +154,14 @@ export default function ProjectReports({
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Select Project</label>
+            <label className="text-sm font-medium text-muted-foreground">
+              Select Project
+            </label>
             <Select value={selectedProjectId} onValueChange={onProjectChange}>
-              <SelectTrigger className="w-full max-w-xs" data-testid="select-project-report">
+              <SelectTrigger
+                className="w-full max-w-xs"
+                data-testid="select-project-report"
+              >
                 <SelectValue placeholder="Choose a project..." />
               </SelectTrigger>
               <SelectContent>
@@ -160,7 +198,9 @@ export default function ProjectReports({
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{completionPercentage}%</div>
+                <div className="text-2xl font-bold">
+                  {completionPercentage}%
+                </div>
                 <Progress value={completionPercentage} className="mt-2" />
               </CardContent>
             </Card>
@@ -188,7 +228,9 @@ export default function ProjectReports({
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-destructive">{overdueTasks}</div>
+                <div className="text-2xl font-bold text-destructive">
+                  {overdueTasks}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Need attention
                 </p>
@@ -244,19 +286,25 @@ export default function ProjectReports({
                           paddingAngle={2}
                         >
                           {bucketDistribution.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value: number, name: string) => [`${value} tasks`, name]}
+                          formatter={(value: number, name: string) => [
+                            `${value} tasks`,
+                            name,
+                          ]}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
                           }}
                         />
-                        <Legend 
-                          layout="horizontal" 
-                          verticalAlign="bottom" 
+                        <Legend
+                          layout="horizontal"
+                          verticalAlign="bottom"
                           align="center"
                           wrapperStyle={{ paddingTop: 10 }}
                         />
@@ -281,7 +329,10 @@ export default function ProjectReports({
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={statusData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <BarChart
+                      data={statusData}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="status" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
@@ -293,7 +344,10 @@ export default function ProjectReports({
                       />
                       <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                         {statusData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
                         ))}
                       </Bar>
                     </BarChart>
