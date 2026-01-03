@@ -1,0 +1,144 @@
+Role: Senior Frontend Engineer  
+Project: SPECTROPY PMS  
+Task: Enable Mobile Responsive UI + Fix Page Re-render Issues  
+
+---
+
+## 🎯 OBJECTIVES
+
+1. Make the **entire PMS website mobile responsive**
+2. Fix issues where **UI does not re-render after actions** (create/update/delete)
+3. Ensure state updates and data refresh correctly after every action
+
+---
+
+## 📱 PART 1: MOBILE RESPONSIVE UI (MANDATORY)
+
+### Overall Requirements
+- Website must work properly on:
+  - Mobile (≤ 768px)
+  - Tablet
+  - Desktop
+- Use **Tailwind responsive utilities** (`sm`, `md`, `lg`)
+- No separate mobile app — same React app adapts layout
+
+---
+
+### Layout Adjustments
+
+#### 1️⃣ Left Sidebar
+- Desktop:
+  - Fixed sidebar visible
+- Mobile:
+  - Sidebar must collapse
+  - Add **hamburger menu button**
+  - Sidebar opens as slide-in drawer
+  - Clicking outside closes sidebar
+
+#### 2️⃣ Pages to Update
+Ensure responsiveness for:
+- Dashboard (Admin & User)
+- Projects (Grid view → stack vertically on mobile)
+- Project Board (Kanban):
+  - Horizontal scroll for buckets
+  - Buckets full-width on small screens
+- Reports:
+  - Tabs scroll horizontally
+  - Charts resize properly
+- User Management:
+  - Single column layout
+  - Dropdown full width
+
+---
+
+### UI Rules
+- Buttons → full width on mobile
+- Tables → convert to stacked cards
+- Modals → fullscreen on mobile
+- Text sizes adjust automatically
+- No horizontal overflow except Kanban board
+
+---
+
+## 🔄 PART 2: FIX UI NOT RE-RENDERING AFTER ACTIONS
+
+### Problem
+- After actions like:
+  - Create task
+  - Update task
+  - Delete task
+  - Update user permissions
+- UI does not refresh automatically
+
+---
+
+### Required Fix (IMPORTANT)
+
+#### 1️⃣ React Query / State Refresh
+For every mutation:
+- Ensure `queryClient.invalidateQueries()` is called correctly
+- Query keys must match fetch keys exactly
+
+Example logic (do NOT change APIs):
+- After create → invalidate list query
+- After update → invalidate detail & list query
+- After delete → invalidate list query
+
+---
+
+#### 2️⃣ Local State Sync
+- Avoid stale local state
+- Do not rely only on props after mutation
+- Ensure:
+  - Dialog close triggers refresh
+  - Selected items update after mutation
+
+---
+
+#### 3️⃣ Forced Re-render Safety
+Where necessary:
+- Use `key` prop tied to IDs
+- Use state updates after success callbacks
+- Avoid direct mutation of objects/arrays
+
+---
+
+## 🧪 TEST CASES (MUST PASS)
+
+- Perform action → UI updates instantly
+- No manual refresh needed
+- Mobile view:
+  - Navigation works
+  - All buttons usable
+  - No broken layout
+- Desktop view unaffected
+
+---
+
+## 🎨 UX EXPECTATIONS
+- Smooth transitions
+- No flicker
+- Consistent Dev21 design
+- Loading states during API calls
+
+---
+
+## ⚠️ CONSTRAINTS
+
+- ❌ Do NOT change backend APIs
+- ❌ Do NOT introduce breaking changes
+- ✅ Only frontend responsiveness + re-render fixes
+
+---
+
+## ✅ EXPECTED OUTCOME
+
+- Fully mobile-responsive PMS
+- Sidebar adapts to screen size
+- Kanban usable on mobile
+- UI re-renders correctly after every action
+- Professional, stable user experience
+
+---
+
+Proceed step-by-step and confirm once mobile responsiveness and re-render issues are resolved.
