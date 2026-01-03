@@ -8,7 +8,6 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import ProjectBoard from "@/pages/ProjectBoard";
-import Tasks from "@/pages/Tasks";
 import Reports from "@/pages/Reports";
 import Auth from "@/pages/Auth";
 import UserDashboard from "@/pages/UserDashboard";
@@ -44,13 +43,6 @@ function Router() {
         <ProtectedRoute role="Admin">
           <Layout>
             <ProjectBoard />
-          </Layout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/tasks">
-        <ProtectedRoute role="Admin">
-          <Layout>
-            <Tasks />
           </Layout>
         </ProtectedRoute>
       </Route>
