@@ -64,6 +64,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Project, Bucket, Task, User, ChecklistItem, Attachment, HistoryEntry } from "@shared/schema";
 import { motion } from "framer-motion";
 import { useUpload } from "@/hooks/use-upload";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useToast } from "@/hooks/use-toast";
 
 interface BucketWithTasks extends Bucket {
   tasks: Task[];
@@ -73,6 +75,8 @@ export default function ProjectBoard() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const projectId = Number(id);
+  const { toast } = useToast();
+  const { canCreateTask, canUpdateTask, canCompleteTask, canDeleteTask, isAdmin } = usePermissions();
 
   const currentUserId = Number(localStorage.getItem("userId")) || null;
   const currentUserName = localStorage.getItem("userName") || "Unknown";
@@ -294,6 +298,10 @@ export default function ProjectBoard() {
   };
 
   const handleOpenEditTask = (task: Task) => {
+    if (!canUpdateTask && !canCompleteTask) {
+      toast({ title: "Permission denied", description: "You do not have permission to edit tasks", variant: "destructive" });
+      return;
+    }
     setEditingTask(task);
     setEditTaskTitle(task.title);
     setEditTaskDescription(task.description || "");
@@ -345,6 +353,10 @@ export default function ProjectBoard() {
 
   const handleDeleteTask = (task: Task, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!canDeleteTask) {
+      toast({ title: "Permission denied", description: "You do not have permission to delete tasks", variant: "destructive" });
+      return;
+    }
     if (confirm("Are you sure you want to delete this task?")) {
       deleteTaskMutation.mutate(task.id);
     }
@@ -358,6 +370,11 @@ export default function ProjectBoard() {
 
   const handleToggleTaskComplete = async (task: Task, completed: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    if (!canCompleteTask) {
+      toast({ title: "Permission denied", description: "You do not have permission to mark tasks as complete/incomplete", variant: "destructive" });
+      return;
+    }
     
     updateTaskMutation.mutate({
       id: task.id,
@@ -598,9 +615,14 @@ export default function ProjectBoard() {
                   size="icon"
                   className="h-8 w-8"
                   onClick={() => {
+                    if (!canCreateTask) {
+                      toast({ title: "Permission denied", description: "You do not have permission to create tasks", variant: "destructive" });
+                      return;
+                    }
                     setSelectedBucketId(bucket.id);
                     setIsNewTaskOpen(true);
                   }}
+                  disabled={!canCreateTask}
                   data-testid={`button-add-task-${bucket.id}`}
                 >
                   <Plus className="h-4 w-4" />
