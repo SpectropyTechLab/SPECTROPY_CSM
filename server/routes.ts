@@ -11,7 +11,13 @@ import {
   createTaskUpdateEmail,
 } from "./emailService";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { checklistItemSchema, attachmentSchema } from "@shared/schema";
+import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
+import { 
+  createPermissionMiddleware, 
+  requireAdmin, 
+  hasPermission,
+  getUserWithPermissions 
+} from "./permissions";
 
 const otpMap = new Map<
   string,
@@ -151,6 +157,11 @@ export async function registerRoutes(
 
   app.post(api.projects.create.path, async (req, res) => {
     try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "CREATE_PROJECT"))) {
+        return res.status(403).json({ error: "Permission denied", message: "You do not have permission to create projects" });
+      }
+      
       const input = api.projects.create.input.parse(req.body);
       const userId = getCurrentUserId(req);
 
@@ -171,6 +182,11 @@ export async function registerRoutes(
 
   app.patch(api.projects.update.path, async (req, res) => {
     try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "UPDATE_PROJECT"))) {
+        return res.status(403).json({ error: "Permission denied", message: "You do not have permission to update projects" });
+      }
+      
       const input = api.projects.update.input.parse(req.body);
       const userId = getCurrentUserId(req);
 
@@ -189,8 +205,17 @@ export async function registerRoutes(
   });
 
   app.delete(api.projects.delete.path, async (req, res) => {
-    await storage.deleteProject(Number(req.params.id));
-    res.status(204).send();
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "DELETE_PROJECT"))) {
+        return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete projects" });
+      }
+      
+      await storage.deleteProject(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete project" });
+    }
   });
 
   app.post(api.projects.clone.path, async (req, res) => {
@@ -231,6 +256,11 @@ export async function registerRoutes(
 
   app.post(api.tasks.create.path, async (req, res) => {
     try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "CREATE_TASK"))) {
+        return res.status(403).json({ error: "Permission denied", message: "You do not have permission to create tasks" });
+      }
+      
       const input = api.tasks.create.input.parse(req.body);
       const task = await storage.createTask(input);
 
@@ -269,11 +299,29 @@ export async function registerRoutes(
 
   app.patch(api.tasks.update.path, async (req, res) => {
     try {
-      const input = api.tasks.update.input.parse(req.body);
+      const currentUser = await storage.getUser(getCurrentUserId(req));
       const existingTask = await storage.getTask(Number(req.params.id));
+      const input = api.tasks.update.input.parse(req.body);
+      
+      const isCompletion = input.status === "completed" && existingTask?.status !== "completed";
+      const isUncompletion = input.status !== "completed" && existingTask?.status === "completed";
+      
+      if (!currentUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      if (isCompletion || isUncompletion) {
+        if (currentUser.role !== "Admin" && !hasPermission(currentUser, "COMPLETE_TASK")) {
+          return res.status(403).json({ error: "Permission denied", message: "You do not have permission to mark tasks as complete/incomplete" });
+        }
+      } else if (Object.keys(input).length > 0) {
+        if (currentUser.role !== "Admin" && !hasPermission(currentUser, "UPDATE_TASK")) {
+          return res.status(403).json({ error: "Permission denied", message: "You do not have permission to update tasks" });
+        }
+      }
+      
       const task = await storage.updateTask(Number(req.params.id), input);
       const project = await storage.getProject(task.projectId);
-      const currentUser = await storage.getUser(getCurrentUserId(req));
 
       if (project) {
         const isCompletion =
@@ -365,8 +413,17 @@ export async function registerRoutes(
   });
 
   app.delete(api.tasks.delete.path, async (req, res) => {
-    await storage.deleteTask(Number(req.params.id));
-    res.status(204).send();
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "DELETE_TASK"))) {
+        return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete tasks" });
+      }
+      
+      await storage.deleteTask(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete task" });
+    }
   });
 
   // Users
@@ -391,6 +448,74 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.errors[0].message });
       }
       res.status(404).json({ message: "User not found" });
+    }
+  });
+
+  app.patch("/api/users/:id/permissions", async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || currentUser.role !== "Admin") {
+        return res.status(403).json({ error: "Permission denied", message: "Only admins can manage user permissions" });
+      }
+      
+      const permissionSchema = z.object({
+        permissions: z.array(z.enum(PERMISSIONS)),
+      });
+      const input = permissionSchema.parse(req.body);
+      const user = await storage.updateUser(Number(req.params.id), { permissions: input.permissions });
+      res.json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
+  app.patch("/api/users/:id/role", async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || currentUser.role !== "Admin") {
+        return res.status(403).json({ error: "Permission denied", message: "Only admins can change user roles" });
+      }
+      
+      const roleSchema = z.object({
+        role: z.enum(["Admin", "User"]),
+      });
+      const input = roleSchema.parse(req.body);
+      const user = await storage.updateUser(Number(req.params.id), { role: input.role });
+      res.json(user);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      res.status(404).json({ message: "User not found" });
+    }
+  });
+
+  app.get("/api/permissions", async (req, res) => {
+    res.json(PERMISSIONS);
+  });
+
+  app.get("/api/users/:id/permissions", async (req, res) => {
+    try {
+      const userWithPermissions = await getUserWithPermissions(Number(req.params.id));
+      if (!userWithPermissions) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        permissions: userWithPermissions.permissions,
+        canCreateTask: userWithPermissions.canCreateTask,
+        canUpdateTask: userWithPermissions.canUpdateTask,
+        canCompleteTask: userWithPermissions.canCompleteTask,
+        canDeleteTask: userWithPermissions.canDeleteTask,
+        canCreateProject: userWithPermissions.canCreateProject,
+        canUpdateProject: userWithPermissions.canUpdateProject,
+        canDeleteProject: userWithPermissions.canDeleteProject,
+        canManageUsers: userWithPermissions.canManageUsers,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to get permissions" });
     }
   });
 

@@ -7,7 +7,9 @@ import {
   LogOut,
   BarChart3,
   User,
+  Users,
   ChevronUp,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +30,7 @@ export function Sidebar() {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Projects", href: "/projects", icon: FolderKanban },
     { label: "Reports", href: "/reports", icon: BarChart3 },
+    { label: "User Management", href: "/users", icon: Shield },
   ];
 
   const userNavItems = [
