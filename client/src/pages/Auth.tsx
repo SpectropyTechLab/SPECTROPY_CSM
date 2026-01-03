@@ -10,13 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -124,11 +117,6 @@ const Auth = () => {
     setSuccess(null);
   };
 
-  const handleRoleChange = (value: string) => {
-    setForm({ ...form, role: value });
-    setError(null);
-  };
-
   const handleSendOtp = () => {
     if (!form.email) {
       setError("Please enter your email first");
@@ -222,24 +210,6 @@ const Auth = () => {
                     className="border-slate-300"
                     data-testid="input-name"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Account Role</Label>
-                  <Select
-                    onValueChange={handleRoleChange}
-                    defaultValue={form.role}
-                  >
-                    <SelectTrigger
-                      className="border-slate-300"
-                      data-testid="select-role"
-                    >
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="User">Standard User</SelectItem>
-                      <SelectItem value="Admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </>
             )}
