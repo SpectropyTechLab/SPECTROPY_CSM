@@ -282,7 +282,34 @@ const Projects = () => {
                             ? "Completed"
                             : "In Progress"}
                       </Badge>
-                      {/* Actions Dropdown remains same */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600" data-testid={`button-project-actions-${project.id}`}>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditProject(project);
+                          }} data-testid={`button-edit-project-${project.id}`}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Project
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-red-600 focus:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleArchiveProject(project.id);
+                            }}
+                            data-testid={`button-archive-project-${project.id}`}
+                          >
+                            <Archive className="h-4 w-4 mr-2" />
+                            Archive Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     <CardTitle className="text-xl font-bold text-slate-900 line-clamp-1">
