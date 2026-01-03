@@ -57,7 +57,7 @@ export default function ProjectReports({
 
   const selectedProject = projects.find((p) => String(p.id) === selectedProjectId);
   const projectTasks = tasks.filter((t) => String(t.projectId) === selectedProjectId);
-  const projectBuckets = buckets.filter((b) => String(b.projectId) === selectedProjectId);
+  const projectBuckets = buckets.filter((b) => Number(b.projectId) === Number(selectedProjectId));
 
   const totalTasks = projectTasks.length;
   const completedTasks = projectTasks.filter((t) => t.status === "completed").length;
