@@ -271,83 +271,13 @@ export async function registerRoutes(
     try {
       const input = api.tasks.update.input.parse(req.body);
       const existingTask = await storage.getTask(Number(req.params.id));
-      if (!existingTask) {
-        return res.status(404).json({ message: "Task not found" });
-      }
-      
       const task = await storage.updateTask(Number(req.params.id), input);
       const project = await storage.getProject(task.projectId);
       const currentUser = await storage.getUser(getCurrentUserId(req));
 
-      // Auto-progress task to next stage on completion
-      const isCompletion = input.status === "completed" && existingTask.status !== "completed";
-      let autoCreatedTask = null;
-      
-      if (isCompletion && task.bucketId) {
-        const buckets = await storage.getBuckets(task.projectId);
-        
-        // Define stage order: To Do → In Progress → Completed
-        const stageOrder = ["To Do", "In Progress", "Completed"];
-        const sortedBuckets = buckets.sort((a, b) => {
-          const aIndex = stageOrder.indexOf(a.title);
-          const bIndex = stageOrder.indexOf(b.title);
-          return aIndex - bIndex;
-        });
-        
-        const currentBucket = sortedBuckets.find(b => b.id === task.bucketId);
-        const currentStageIndex = currentBucket ? stageOrder.indexOf(currentBucket.title) : -1;
-        
-        // Only progress if not in final stage (Completed)
-        if (currentStageIndex >= 0 && currentStageIndex < stageOrder.length - 1) {
-          const nextStageName = stageOrder[currentStageIndex + 1];
-          const nextBucket = sortedBuckets.find(b => b.title === nextStageName);
-          
-          if (nextBucket) {
-            // Get position for new task (last in bucket)
-            const tasksInNextBucket = await storage.getTasksByBucket(nextBucket.id);
-            const maxPosition = tasksInNextBucket.reduce((max, t) => Math.max(max, t.position || 0), 0);
-            
-            // Create history entries
-            const completionDate = new Date();
-            
-            // Update original task history
-            const originalHistory = [...(task.history || []), {
-              action: `Task completed in ${currentBucket?.title || "unknown stage"}`,
-              userId: getCurrentUserId(req),
-              userName: currentUser?.name || "Unknown",
-              timestamp: completionDate.toISOString(),
-            }];
-            await storage.updateTask(task.id, { history: originalHistory });
-            
-            // Create new task in next stage with cleared fields
-            autoCreatedTask = await storage.createTask({
-              title: task.title,
-              description: task.description,
-              status: "todo",
-              priority: task.priority,
-              projectId: task.projectId,
-              bucketId: nextBucket.id,
-              assigneeId: null,
-              assignedUsers: [],
-              checklist: task.checklist || [],
-              attachments: task.attachments || [],
-              estimateHours: 0,
-              estimateMinutes: 0,
-              startDate: null,
-              dueDate: null,
-              position: maxPosition + 1,
-              history: [{
-                action: `Auto-created from ${currentBucket?.title || "previous stage"}`,
-                userId: getCurrentUserId(req),
-                userName: currentUser?.name || "Unknown",
-                timestamp: completionDate.toISOString(),
-              }],
-            });
-          }
-        }
-      }
-
       if (project) {
+        const isCompletion =
+          input.status === "completed" && existingTask?.status !== "completed";
         const isNewAssignment =
           input.assigneeId && input.assigneeId !== existingTask?.assigneeId;
 
@@ -425,12 +355,7 @@ export async function registerRoutes(
         }
       }
 
-      // Return task with auto-created task info if applicable
-      if (autoCreatedTask) {
-        res.json({ ...task, autoCreatedTask });
-      } else {
-        res.json(task);
-      }
+      res.json(task);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
