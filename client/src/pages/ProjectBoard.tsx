@@ -368,10 +368,17 @@ export default function ProjectBoard() {
     setIsHistoryOpen(true);
   };
 
+  const isAssignedToTask = (task: Task): boolean => {
+    if (!currentUserId) return false;
+    return task.assigneeId === currentUserId || 
+           Boolean(task.assignedUsers && task.assignedUsers.includes(currentUserId));
+  };
+
   const handleToggleTaskComplete = async (task: Task, completed: boolean, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!canCompleteTask) {
+    const canComplete = canCompleteTask || isAssignedToTask(task);
+    if (!canComplete) {
       toast({ title: "Permission denied", description: "You do not have permission to mark tasks as complete/incomplete", variant: "destructive" });
       return;
     }

@@ -58,6 +58,7 @@ async function seedDatabase() {
       title: "Project Manager",
       avatar: "https://github.com/shadcn.png",
       role: "Admin",
+      permissions: [],
       otpVerified: true,
     });
 
@@ -68,6 +69,7 @@ async function seedDatabase() {
       name: "Standard User",
       title: "Developer",
       role: "User",
+      permissions: [],
       otpVerified: true,
     });
 
@@ -311,7 +313,12 @@ export async function registerRoutes(
       }
       
       if (isCompletion || isUncompletion) {
-        if (currentUser.role !== "Admin" && !hasPermission(currentUser, "COMPLETE_TASK")) {
+        const isAssignedToTask = existingTask && (
+          existingTask.assigneeId === currentUser.id ||
+          (existingTask.assignedUsers && existingTask.assignedUsers.includes(currentUser.id))
+        );
+        
+        if (currentUser.role !== "Admin" && !hasPermission(currentUser, "COMPLETE_TASK") && !isAssignedToTask) {
           return res.status(403).json({ error: "Permission denied", message: "You do not have permission to mark tasks as complete/incomplete" });
         }
       } else if (Object.keys(input).length > 0) {
@@ -656,6 +663,7 @@ export async function registerRoutes(
         password: hashedPassword,
         name,
         role: role || "User",
+        permissions: [],
         otpVerified: true,
       });
 
