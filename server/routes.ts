@@ -319,7 +319,7 @@ export async function registerRoutes(
             }];
             await storage.updateTask(task.id, { history: originalHistory });
             
-            // Create new task in next stage
+            // Create new task in next stage with cleared fields
             autoCreatedTask = await storage.createTask({
               title: task.title,
               description: task.description,
@@ -327,8 +327,8 @@ export async function registerRoutes(
               priority: task.priority,
               projectId: task.projectId,
               bucketId: nextBucket.id,
-              assigneeId: task.assigneeId,
-              assignedUsers: task.assignedUsers || [],
+              assigneeId: null,
+              assignedUsers: [],
               checklist: task.checklist || [],
               attachments: task.attachments || [],
               estimateHours: 0,
