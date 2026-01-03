@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -251,7 +252,7 @@ export default function DeadlineReports({
             </Card>
           </motion.div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -266,21 +267,22 @@ export default function DeadlineReports({
                 </CardHeader>
                 <CardContent>
                   {trendData.length === 0 ? (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
                       No data in this range
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={trendData}>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <LineChart data={trendData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
                           }}
                         />
+                        <Legend />
                         <Line type="monotone" dataKey="due" stroke="#4f46e5" strokeWidth={2} name="Due" />
                         <Line type="monotone" dataKey="completed" stroke="#10b981" strokeWidth={2} name="Completed" />
                       </LineChart>
@@ -303,20 +305,18 @@ export default function DeadlineReports({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={statusBreakdown}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={statusBreakdown} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="status" />
-                      <YAxis />
+                      <XAxis dataKey="status" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                         }}
                       />
-                      <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                        <Bar dataKey="count" fill="#10b981" />
-                      </Bar>
+                      <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

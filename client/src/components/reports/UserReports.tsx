@@ -221,7 +221,7 @@ export default function UserReports({
             </Card>
           </motion.div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -235,33 +235,36 @@ export default function UserReports({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={280}>
                     <PieChart>
                       <Pie
                         data={statusData}
                         cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={100}
-                        innerRadius={60}
+                        cy="45%"
+                        outerRadius={80}
+                        innerRadius={45}
                         fill="#8884d8"
                         dataKey="count"
                         nameKey="status"
-                        label={({ status, count, percent }) =>
-                          count > 0 ? `${status}: ${count} (${(percent * 100).toFixed(0)}%)` : ""
-                        }
+                        paddingAngle={2}
                       >
                         {statusData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip
+                        formatter={(value: number, name: string) => [`${value} tasks`, name]}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                         }}
                       />
-                      <Legend />
+                      <Legend 
+                        layout="horizontal" 
+                        verticalAlign="bottom" 
+                        align="center"
+                        wrapperStyle={{ paddingTop: 10 }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -281,11 +284,11 @@ export default function UserReports({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={priorityData}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={priorityData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="priority" />
-                      <YAxis />
+                      <XAxis dataKey="priority" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",

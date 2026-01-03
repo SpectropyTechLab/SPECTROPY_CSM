@@ -74,10 +74,12 @@ export default function ProjectReports({
   }, 0);
   const estimatedHours = Math.round(estimatedMinutes / 60);
 
-  const bucketDistribution = projectBuckets.map((bucket) => ({
-    name: bucket.name,
-    count: projectTasks.filter((t) => t.bucketId === bucket.id).length,
-  }));
+  const bucketDistribution = projectBuckets
+    .map((bucket) => ({
+      name: bucket.name || "Unnamed",
+      count: projectTasks.filter((t) => t.bucketId === bucket.id).length,
+    }))
+    .filter((b) => b.count > 0);
 
   const statusData = [
     { status: "Not Started", count: projectTasks.filter((t) => t.status === "todo").length },
@@ -209,7 +211,7 @@ export default function ProjectReports({
             </Card>
           </motion.div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 grid-cols-1 xl:grid-cols-2">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -224,37 +226,40 @@ export default function ProjectReports({
                 </CardHeader>
                 <CardContent>
                   {bucketDistribution.length === 0 ? (
-                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                      No buckets in this project
+                    <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                      No tasks in buckets
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={280}>
                       <PieChart>
                         <Pie
                           data={bucketDistribution}
                           cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={100}
-                          innerRadius={60}
+                          cy="45%"
+                          outerRadius={80}
+                          innerRadius={45}
                           fill="#8884d8"
                           dataKey="count"
                           nameKey="name"
-                          label={({ name, count, percent }) =>
-                            count > 0 ? `${name}: ${count} (${(percent * 100).toFixed(0)}%)` : ""
-                          }
+                          paddingAngle={2}
                         >
                           {bucketDistribution.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip
+                          formatter={(value: number, name: string) => [`${value} tasks`, name]}
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
                           }}
                         />
-                        <Legend />
+                        <Legend 
+                          layout="horizontal" 
+                          verticalAlign="bottom" 
+                          align="center"
+                          wrapperStyle={{ paddingTop: 10 }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   )}
@@ -275,11 +280,11 @@ export default function ProjectReports({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={statusData}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={statusData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="status" />
-                      <YAxis />
+                      <XAxis dataKey="status" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
