@@ -11,7 +11,7 @@ import {
   createTaskUpdateEmail,
 } from "./emailService";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
-import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
+import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission, type User } from "@shared/schema";
 import { 
   createPermissionMiddleware, 
   requireAdmin, 
@@ -351,7 +351,8 @@ export async function registerRoutes(
           if (projectOwner) recipients.set(projectOwner.id, projectOwner);
           if (taskCreator) recipients.set(taskCreator.id, taskCreator);
 
-          for (const recipient of recipients.values()) {
+          const recipientsArray = Array.from(recipients.values());
+          for (const recipient of recipientsArray) {
             if (recipient.email) {
               const { subject, html } = createTaskCompletionEmail({
                 taskTitle: task.title,
