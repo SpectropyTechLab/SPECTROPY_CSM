@@ -77,7 +77,7 @@ export default function ProjectReports({
   const bucketDistribution = projectBuckets
     .map((bucket) => ({
       name: bucket.name || "Unnamed",
-      count: projectTasks.filter((t) => t.bucketId === bucket.id).length,
+      count: projectTasks.filter((t) => Number(t.bucketId) === Number(bucket.id)).length,
     }))
     .filter((b) => b.count > 0);
 
