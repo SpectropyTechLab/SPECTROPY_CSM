@@ -948,9 +948,9 @@ export default function ProjectBoard() {
                                   asChild
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <Badge
+                                  <Button
                                     variant="secondary"
-                                    className={`text-xs cursor-pointer ${getStatusColor(task.status)}`}
+                                    className={`text-xs h-6 px-2 rounded-md border-0 ${getStatusColor(task.status)} no-default-hover-elevate no-default-active-elevate hover:brightness-95 transition-all`}
                                     data-testid={`badge-status-${task.id}`}
                                   >
                                     {task.status === "completed" && (
@@ -961,7 +961,7 @@ export default function ProjectBoard() {
                                     )}
                                     {getStatusLabel(task.status)}
                                     <ChevronDown className="h-3 w-3 ml-1" />
-                                  </Badge>
+                                  </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start">
                                   <DropdownMenuItem
