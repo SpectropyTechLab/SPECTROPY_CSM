@@ -61,7 +61,15 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Project, Bucket, Task, User, ChecklistItem, Attachment, HistoryEntry } from "@shared/schema";
+import type {
+  Project,
+  Bucket,
+  Task,
+  User,
+  ChecklistItem,
+  Attachment,
+  HistoryEntry,
+} from "@shared/schema";
 import { motion } from "framer-motion";
 import { useUpload } from "@/hooks/use-upload";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -76,7 +84,13 @@ export default function ProjectBoard() {
   const [, navigate] = useLocation();
   const projectId = Number(id);
   const { toast } = useToast();
-  const { canCreateTask, canUpdateTask, canCompleteTask, canDeleteTask, isAdmin } = usePermissions();
+  const {
+    canCreateTask,
+    canUpdateTask,
+    canCompleteTask,
+    canDeleteTask,
+    isAdmin,
+  } = usePermissions();
 
   const currentUserId = Number(localStorage.getItem("userId")) || null;
   const currentUserName = localStorage.getItem("userName") || "Unknown";
@@ -116,8 +130,12 @@ export default function ProjectBoard() {
   const [editTaskEndDate, setEditTaskEndDate] = useState("");
   const [editTaskEstimateHours, setEditTaskEstimateHours] = useState(0);
   const [editTaskEstimateMinutes, setEditTaskEstimateMinutes] = useState(0);
-  const [editTaskChecklist, setEditTaskChecklist] = useState<ChecklistItem[]>([]);
-  const [editTaskAttachments, setEditTaskAttachments] = useState<Attachment[]>([]);
+  const [editTaskChecklist, setEditTaskChecklist] = useState<ChecklistItem[]>(
+    [],
+  );
+  const [editTaskAttachments, setEditTaskAttachments] = useState<Attachment[]>(
+    [],
+  );
   const [newChecklistItem, setNewChecklistItem] = useState("");
 
   const { uploadFile, isUploading } = useUpload({
@@ -254,7 +272,9 @@ export default function ProjectBoard() {
       position: targetPosition,
       history: [
         ...(draggedTask.history || []),
-        createHistoryEntry(`Moved to ${buckets.find((b) => b.id === bucketId)?.title}`),
+        createHistoryEntry(
+          `Moved to ${buckets.find((b) => b.id === bucketId)?.title}`,
+        ),
       ],
     });
     setDraggedTask(null);
@@ -276,7 +296,9 @@ export default function ProjectBoard() {
       assignedUsers: newTaskAssignees,
       position: maxPosition + 1,
       status: "todo",
-      startDate: newTaskStartDate ? new Date(newTaskStartDate + "T12:00:00") : null,
+      startDate: newTaskStartDate
+        ? new Date(newTaskStartDate + "T12:00:00")
+        : null,
       dueDate: newTaskEndDate ? new Date(newTaskEndDate + "T12:00:00") : null,
       estimateHours: newTaskEstimateHours,
       estimateMinutes: newTaskEstimateMinutes,
@@ -299,20 +321,28 @@ export default function ProjectBoard() {
 
   const handleOpenEditTask = (task: Task) => {
     if (!canUpdateTask && !canCompleteTask) {
-      toast({ title: "Permission denied", description: "You do not have permission to edit tasks", variant: "destructive" });
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to edit tasks",
+        variant: "destructive",
+      });
       return;
     }
     setEditingTask(task);
     setEditTaskTitle(task.title);
     setEditTaskDescription(task.description || "");
     setEditTaskPriority(task.priority);
-    setEditTaskAssignees(task.assignedUsers || (task.assigneeId ? [task.assigneeId] : []));
+    setEditTaskAssignees(
+      task.assignedUsers || (task.assigneeId ? [task.assigneeId] : []),
+    );
     setEditTaskStatus(task.status || "todo");
     setEditTaskStartDate(
-      task.startDate ? new Date(task.startDate).toISOString().split("T")[0] : ""
+      task.startDate
+        ? new Date(task.startDate).toISOString().split("T")[0]
+        : "",
     );
     setEditTaskEndDate(
-      task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : ""
+      task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "",
     );
     setEditTaskEstimateHours(task.estimateHours || 0);
     setEditTaskEstimateMinutes(task.estimateMinutes || 0);
@@ -332,16 +362,15 @@ export default function ProjectBoard() {
       assigneeId: editTaskAssignees[0] || null,
       assignedUsers: editTaskAssignees,
       status: editTaskStatus,
-      startDate: editTaskStartDate ? new Date(editTaskStartDate + "T12:00:00") : null,
+      startDate: editTaskStartDate
+        ? new Date(editTaskStartDate + "T12:00:00")
+        : null,
       dueDate: editTaskEndDate ? new Date(editTaskEndDate + "T12:00:00") : null,
       estimateHours: editTaskEstimateHours,
       estimateMinutes: editTaskEstimateMinutes,
       checklist: editTaskChecklist,
       attachments: editTaskAttachments,
-      history: [
-        ...(editingTask.history || []),
-        createHistoryEntry("Updated"),
-      ],
+      history: [...(editingTask.history || []), createHistoryEntry("Updated")],
     });
     setIsEditTaskOpen(false);
     setEditingTask(null);
@@ -350,7 +379,11 @@ export default function ProjectBoard() {
   const handleDeleteTask = (task: Task, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!canDeleteTask) {
-      toast({ title: "Permission denied", description: "You do not have permission to delete tasks", variant: "destructive" });
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to delete tasks",
+        variant: "destructive",
+      });
       return;
     }
     if (confirm("Are you sure you want to delete this task?")) {
@@ -366,26 +399,41 @@ export default function ProjectBoard() {
 
   const isAssignedToTask = (task: Task): boolean => {
     if (!currentUserId) return false;
-    return task.assigneeId === currentUserId || 
-           Boolean(task.assignedUsers && task.assignedUsers.includes(currentUserId));
+    return (
+      task.assigneeId === currentUserId ||
+      Boolean(task.assignedUsers && task.assignedUsers.includes(currentUserId))
+    );
   };
 
   const handleStatusChange = async (task: Task, newStatus: string) => {
     const isCompletion = newStatus === "completed";
     const canComplete = canCompleteTask || isAssignedToTask(task);
-    
+
     if (isCompletion && !canComplete) {
-      toast({ title: "Permission denied", description: "You do not have permission to mark tasks as complete", variant: "destructive" });
-      return;
-    }
-    
-    if (!canUpdateTask && !canComplete) {
-      toast({ title: "Permission denied", description: "You do not have permission to update task status", variant: "destructive" });
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to mark tasks as complete",
+        variant: "destructive",
+      });
       return;
     }
 
-    const statusLabel = newStatus === "todo" ? "Not Started" : newStatus === "in_progress" ? "In Progress" : "Completed";
-    
+    if (!canUpdateTask && !canComplete) {
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to update task status",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const statusLabel =
+      newStatus === "todo"
+        ? "Not Started"
+        : newStatus === "in_progress"
+          ? "In Progress"
+          : "Completed";
+
     updateTaskMutation.mutate({
       id: task.id,
       status: newStatus,
@@ -396,9 +444,11 @@ export default function ProjectBoard() {
     });
 
     if (newStatus === "completed" && buckets) {
-      const currentBucketIndex = buckets.findIndex((b) => b.id === task.bucketId);
+      const currentBucketIndex = buckets.findIndex(
+        (b) => b.id === task.bucketId,
+      );
       const nextBucket = buckets[currentBucketIndex + 1];
-      
+
       if (nextBucket) {
         const newTaskData = {
           title: task.title,
@@ -414,9 +464,13 @@ export default function ProjectBoard() {
           estimateMinutes: task.estimateMinutes || 0,
           checklist: [],
           attachments: [],
-          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`)],
+          history: [
+            createHistoryEntry(
+              `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
+            ),
+          ],
         };
-        
+
         createTaskMutation.mutate(newTaskData);
       }
     }
@@ -424,44 +478,65 @@ export default function ProjectBoard() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "todo": return "Not Started";
-      case "in_progress": return "In Progress";
-      case "completed": return "Completed";
-      default: return "Not Started";
+      case "todo":
+        return "Not Started";
+      case "in_progress":
+        return "In Progress";
+      case "completed":
+        return "Completed";
+      default:
+        return "Not Started";
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "todo": return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
-      case "in_progress": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-      case "completed": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-      default: return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+      case "todo":
+        return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+      case "in_progress":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "completed":
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
+      default:
+        return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
     }
   };
 
-  const handleToggleTaskComplete = async (task: Task, completed: boolean, e: React.MouseEvent) => {
+  const handleToggleTaskComplete = async (
+    task: Task,
+    completed: boolean,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation();
-    
+
     const canComplete = canCompleteTask || isAssignedToTask(task);
     if (!canComplete) {
-      toast({ title: "Permission denied", description: "You do not have permission to mark tasks as complete/incomplete", variant: "destructive" });
+      toast({
+        title: "Permission denied",
+        description:
+          "You do not have permission to mark tasks as complete/incomplete",
+        variant: "destructive",
+      });
       return;
     }
-    
+
     updateTaskMutation.mutate({
       id: task.id,
       status: completed ? "completed" : "todo",
       history: [
         ...(task.history || []),
-        createHistoryEntry(completed ? "Marked as completed" : "Marked as incomplete"),
+        createHistoryEntry(
+          completed ? "Marked as completed" : "Marked as incomplete",
+        ),
       ],
     });
 
     if (completed && buckets) {
-      const currentBucketIndex = buckets.findIndex((b) => b.id === task.bucketId);
+      const currentBucketIndex = buckets.findIndex(
+        (b) => b.id === task.bucketId,
+      );
       const nextBucket = buckets[currentBucketIndex + 1];
-      
+
       if (nextBucket) {
         const newTaskData = {
           title: task.title,
@@ -477,9 +552,13 @@ export default function ProjectBoard() {
           estimateMinutes: task.estimateMinutes || 0,
           checklist: [],
           attachments: [],
-          history: [createHistoryEntry(`Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`)],
+          history: [
+            createHistoryEntry(
+              `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
+            ),
+          ],
         };
-        
+
         createTaskMutation.mutate(newTaskData);
       }
     }
@@ -499,33 +578,41 @@ export default function ProjectBoard() {
   const handleToggleChecklistItem = (itemId: string) => {
     setEditTaskChecklist(
       editTaskChecklist.map((item) =>
-        item.id === itemId ? { ...item, completed: !item.completed } : item
-      )
+        item.id === itemId ? { ...item, completed: !item.completed } : item,
+      ),
     );
   };
 
   const handleRemoveChecklistItem = (itemId: string) => {
-    setEditTaskChecklist(editTaskChecklist.filter((item) => item.id !== itemId));
+    setEditTaskChecklist(
+      editTaskChecklist.filter((item) => item.id !== itemId),
+    );
   };
 
   const handleRemoveAttachment = (attachmentId: string) => {
-    setEditTaskAttachments(editTaskAttachments.filter((att) => att.id !== attachmentId));
+    setEditTaskAttachments(
+      editTaskAttachments.filter((att) => att.id !== attachmentId),
+    );
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (file.size > 10 * 1024 * 1024) {
       alert("File size exceeds 10MB limit");
       return;
     }
-    
+
     await uploadFile(file);
     e.target.value = "";
   };
 
-  const toggleAssignee = (userId: number, assignees: number[], setAssignees: (a: number[]) => void) => {
+  const toggleAssignee = (
+    userId: number,
+    assignees: number[],
+    setAssignees: (a: number[]) => void,
+  ) => {
     if (assignees.includes(userId)) {
       setAssignees(assignees.filter((id) => id !== userId));
     } else {
@@ -547,19 +634,28 @@ export default function ProjectBoard() {
   };
 
   const getAssignees = (task: Task) => {
-    const assigneeIds = task.assignedUsers?.length ? task.assignedUsers : (task.assigneeId ? [task.assigneeId] : []);
+    const assigneeIds = task.assignedUsers?.length
+      ? task.assignedUsers
+      : task.assigneeId
+        ? [task.assigneeId]
+        : [];
     return users.filter((u) => assigneeIds.includes(u.id));
   };
 
   const getChecklistProgress = (checklist: ChecklistItem[] | null) => {
     if (!checklist || checklist.length === 0) return null;
     const completed = checklist.filter((item) => item.completed).length;
-    return { completed, total: checklist.length, percentage: Math.round((completed / checklist.length) * 100) };
+    return {
+      completed,
+      total: checklist.length,
+      percentage: Math.round((completed / checklist.length) * 100),
+    };
   };
 
   const getFileIcon = (type: string) => {
     if (type.startsWith("image/")) return <Image className="h-4 w-4" />;
-    if (type.includes("pdf") || type.includes("document")) return <FileText className="h-4 w-4" />;
+    if (type.includes("pdf") || type.includes("document"))
+      return <FileText className="h-4 w-4" />;
     return <File className="h-4 w-4" />;
   };
 
@@ -575,7 +671,11 @@ export default function ProjectBoard() {
     return (
       <div className="p-8 text-center">
         <p className="text-muted-foreground">Project not found</p>
-        <Button variant="outline" onClick={() => navigate("/projects")} className="mt-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/projects")}
+          className="mt-4"
+        >
           Back to Projects
         </Button>
       </div>
@@ -596,7 +696,10 @@ export default function ProjectBoard() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="text-lg md:text-xl font-semibold truncate" data-testid="text-project-name">
+            <h1
+              className="text-lg md:text-xl font-semibold truncate"
+              data-testid="text-project-name"
+            >
               {project.name}
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground truncate">
@@ -607,7 +710,11 @@ export default function ProjectBoard() {
 
         <Dialog open={isNewBucketOpen} onOpenChange={setIsNewBucketOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto" data-testid="button-add-bucket">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              data-testid="button-add-bucket"
+            >
               <Plus className="h-4 w-4 mr-2" />
               Add Bucket
             </Button>
@@ -640,8 +747,11 @@ export default function ProjectBoard() {
         </Dialog>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-2 md:p-4">
-        <div className="flex gap-3 md:gap-4 h-full pb-4" style={{ minWidth: "max-content" }}>
+      <div className="flex-1 overflow-x-auto p-2 md:p-4 ">
+        <div
+          className="flex gap-3 md:gap-4 h-full pb-4"
+          style={{ minWidth: "max-content" }}
+        >
           {bucketsWithTasks.map((bucket) => (
             <motion.div
               key={bucket.id}
@@ -690,7 +800,12 @@ export default function ProjectBoard() {
                   className="h-8 w-8"
                   onClick={() => {
                     if (!canCreateTask) {
-                      toast({ title: "Permission denied", description: "You do not have permission to create tasks", variant: "destructive" });
+                      toast({
+                        title: "Permission denied",
+                        description:
+                          "You do not have permission to create tasks",
+                        variant: "destructive",
+                      });
                       return;
                     }
                     setSelectedBucketId(bucket.id);
@@ -707,20 +822,31 @@ export default function ProjectBoard() {
                 className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
                 onDragOver={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.add(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                 }}
                 onDragLeave={(e) => {
-                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.remove(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                  e.currentTarget.classList.remove(
+                    "bg-slate-100",
+                    "dark:bg-slate-700/50",
+                  );
                   handleDrop(bucket.id, bucket.tasks.length);
                 }}
               >
                 {bucket.tasks.map((task) => {
                   const assignees = getAssignees(task);
-                  const checklistProgress = getChecklistProgress(task.checklist);
+                  const checklistProgress = getChecklistProgress(
+                    task.checklist,
+                  );
                   const attachmentCount = task.attachments?.length || 0;
 
                   return (
@@ -745,13 +871,19 @@ export default function ProjectBoard() {
                           <Checkbox
                             checked={task.status === "completed"}
                             onCheckedChange={(checked) => {
-                              handleStatusChange(task, checked ? "completed" : "todo");
+                              handleStatusChange(
+                                task,
+                                checked ? "completed" : "todo",
+                              );
                             }}
                             onClick={(e) => e.stopPropagation()}
                             className="mt-1 flex-shrink-0"
                             data-testid={`checkbox-task-${task.id}`}
                           />
-                          <div className="flex-1 min-w-0" onClick={() => handleOpenEditTask(task)}>
+                          <div
+                            className="flex-1 min-w-0"
+                            onClick={() => handleOpenEditTask(task)}
+                          >
                             <div className="flex items-start justify-between gap-2">
                               <p
                                 className={`font-medium text-sm truncate ${
@@ -764,17 +896,31 @@ export default function ProjectBoard() {
                                 {task.title}
                               </p>
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
+                                <DropdownMenuTrigger
+                                  asChild
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 flex-shrink-0"
+                                  >
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleOpenEditTask(task); }}>
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditTask(task);
+                                    }}
+                                  >
                                     <Edit className="h-4 w-4 mr-2" />
                                     Edit Task
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={(e) => handleViewHistory(task, e)}>
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleViewHistory(task, e)}
+                                  >
                                     <History className="h-4 w-4 mr-2" />
                                     View History
                                   </DropdownMenuItem>
@@ -798,34 +944,60 @@ export default function ProjectBoard() {
 
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                               <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuTrigger
+                                  asChild
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <Badge
                                     variant="secondary"
                                     className={`text-xs cursor-pointer ${getStatusColor(task.status)}`}
                                     data-testid={`badge-status-${task.id}`}
                                   >
-                                    {task.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                                    {task.status === "in_progress" && <Clock className="h-3 w-3 mr-1" />}
+                                    {task.status === "completed" && (
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    )}
+                                    {task.status === "in_progress" && (
+                                      <Clock className="h-3 w-3 mr-1" />
+                                    )}
                                     {getStatusLabel(task.status)}
                                     <ChevronDown className="h-3 w-3 ml-1" />
                                   </Badge>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start">
-                                  <DropdownMenuItem 
-                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "todo"); }}
-                                    className={task.status === "todo" ? "bg-accent" : ""}
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStatusChange(task, "todo");
+                                    }}
+                                    className={
+                                      task.status === "todo" ? "bg-accent" : ""
+                                    }
                                   >
                                     Not Started
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "in_progress"); }}
-                                    className={task.status === "in_progress" ? "bg-accent" : ""}
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStatusChange(task, "in_progress");
+                                    }}
+                                    className={
+                                      task.status === "in_progress"
+                                        ? "bg-accent"
+                                        : ""
+                                    }
                                   >
                                     In Progress
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    onClick={(e) => { e.stopPropagation(); handleStatusChange(task, "completed"); }}
-                                    className={task.status === "completed" ? "bg-accent" : ""}
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStatusChange(task, "completed");
+                                    }}
+                                    className={
+                                      task.status === "completed"
+                                        ? "bg-accent"
+                                        : ""
+                                    }
                                   >
                                     Completed
                                   </DropdownMenuItem>
@@ -852,7 +1024,8 @@ export default function ProjectBoard() {
                               {checklistProgress && (
                                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <ListChecks className="h-3 w-3" />
-                                  {checklistProgress.completed}/{checklistProgress.total}
+                                  {checklistProgress.completed}/
+                                  {checklistProgress.total}
                                 </span>
                               )}
                             </div>
@@ -867,9 +1040,11 @@ export default function ProjectBoard() {
                             {(task.startDate || task.dueDate) && (
                               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                                 <Calendar className="h-3 w-3" />
-                                {task.startDate && new Date(task.startDate).toLocaleDateString()}
+                                {task.startDate &&
+                                  new Date(task.startDate).toLocaleDateString()}
                                 {task.startDate && task.dueDate && " - "}
-                                {task.dueDate && new Date(task.dueDate).toLocaleDateString()}
+                                {task.dueDate &&
+                                  new Date(task.dueDate).toLocaleDateString()}
                               </div>
                             )}
 
@@ -877,8 +1052,13 @@ export default function ProjectBoard() {
                               <div className="flex items-center gap-1 mt-2">
                                 <div className="flex -space-x-2">
                                   {assignees.slice(0, 3).map((assignee) => (
-                                    <Avatar key={assignee.id} className="h-5 w-5 border-2 border-white dark:border-slate-800">
-                                      <AvatarImage src={assignee.avatar || undefined} />
+                                    <Avatar
+                                      key={assignee.id}
+                                      className="h-5 w-5 border-2 border-white dark:border-slate-800"
+                                    >
+                                      <AvatarImage
+                                        src={assignee.avatar || undefined}
+                                      />
                                       <AvatarFallback className="text-xs">
                                         {assignee.name.charAt(0)}
                                       </AvatarFallback>
@@ -891,7 +1071,9 @@ export default function ProjectBoard() {
                                   )}
                                 </div>
                                 <span className="text-xs text-muted-foreground ml-1">
-                                  {assignees.length === 1 ? assignees[0].name : `${assignees.length} assignees`}
+                                  {assignees.length === 1
+                                    ? assignees[0].name
+                                    : `${assignees.length} assignees`}
                                 </span>
                               </div>
                             )}
@@ -955,7 +1137,11 @@ export default function ProjectBoard() {
               </label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between" data-testid="button-assign-users-new">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    data-testid="button-assign-users-new"
+                  >
                     <span className="truncate">
                       {newTaskAssignees.length === 0
                         ? "Select users..."
@@ -970,11 +1156,23 @@ export default function ProjectBoard() {
                       <div
                         key={user.id}
                         className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
-                        onClick={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}
+                        onClick={() =>
+                          toggleAssignee(
+                            user.id,
+                            newTaskAssignees,
+                            setNewTaskAssignees,
+                          )
+                        }
                       >
                         <Checkbox
                           checked={newTaskAssignees.includes(user.id)}
-                          onCheckedChange={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}
+                          onCheckedChange={() =>
+                            toggleAssignee(
+                              user.id,
+                              newTaskAssignees,
+                              setNewTaskAssignees,
+                            )
+                          }
                         />
                         <span className="text-sm">{user.name}</span>
                       </div>
@@ -1019,7 +1217,9 @@ export default function ProjectBoard() {
                   min="0"
                   placeholder="Hours"
                   value={newTaskEstimateHours || ""}
-                  onChange={(e) => setNewTaskEstimateHours(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setNewTaskEstimateHours(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-task-estimate-hours"
                 />
@@ -1030,7 +1230,9 @@ export default function ProjectBoard() {
                   max="59"
                   placeholder="Minutes"
                   value={newTaskEstimateMinutes || ""}
-                  onChange={(e) => setNewTaskEstimateMinutes(Number(e.target.value) || 0)}
+                  onChange={(e) =>
+                    setNewTaskEstimateMinutes(Number(e.target.value) || 0)
+                  }
                   className="w-24"
                   data-testid="input-task-estimate-minutes"
                 />
@@ -1059,13 +1261,16 @@ export default function ProjectBoard() {
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 max-h-[65vh]">
+          <ScrollArea className="flex-1 max-h-[65vh] overflow-scroll">
             <div className="space-y-4 py-4 pr-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
                   Status
                 </label>
-                <Select value={editTaskStatus} onValueChange={setEditTaskStatus}>
+                <Select
+                  value={editTaskStatus}
+                  onValueChange={setEditTaskStatus}
+                >
                   <SelectTrigger data-testid="select-edit-task-status">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -1090,7 +1295,10 @@ export default function ProjectBoard() {
                 data-testid="input-edit-task-description"
               />
 
-              <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+              <Select
+                value={editTaskPriority}
+                onValueChange={setEditTaskPriority}
+              >
                 <SelectTrigger data-testid="select-edit-task-priority">
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
@@ -1108,7 +1316,11 @@ export default function ProjectBoard() {
                 </label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between" data-testid="button-assign-users-edit">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between"
+                      data-testid="button-assign-users-edit"
+                    >
                       <span className="truncate">
                         {editTaskAssignees.length === 0
                           ? "Select users..."
@@ -1123,11 +1335,23 @@ export default function ProjectBoard() {
                         <div
                           key={user.id}
                           className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
-                          onClick={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}
+                          onClick={() =>
+                            toggleAssignee(
+                              user.id,
+                              editTaskAssignees,
+                              setEditTaskAssignees,
+                            )
+                          }
                         >
                           <Checkbox
                             checked={editTaskAssignees.includes(user.id)}
-                            onCheckedChange={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}
+                            onCheckedChange={() =>
+                              toggleAssignee(
+                                user.id,
+                                editTaskAssignees,
+                                setEditTaskAssignees,
+                              )
+                            }
                           />
                           <span className="text-sm">{user.name}</span>
                         </div>
@@ -1172,7 +1396,9 @@ export default function ProjectBoard() {
                     min="0"
                     placeholder="Hours"
                     value={editTaskEstimateHours || ""}
-                    onChange={(e) => setEditTaskEstimateHours(Number(e.target.value) || 0)}
+                    onChange={(e) =>
+                      setEditTaskEstimateHours(Number(e.target.value) || 0)
+                    }
                     className="w-24"
                     data-testid="input-edit-task-estimate-hours"
                   />
@@ -1183,7 +1409,9 @@ export default function ProjectBoard() {
                     max="59"
                     placeholder="Minutes"
                     value={editTaskEstimateMinutes || ""}
-                    onChange={(e) => setEditTaskEstimateMinutes(Number(e.target.value) || 0)}
+                    onChange={(e) =>
+                      setEditTaskEstimateMinutes(Number(e.target.value) || 0)
+                    }
                     className="w-24"
                     data-testid="input-edit-task-estimate-minutes"
                   />
@@ -1202,9 +1430,13 @@ export default function ProjectBoard() {
                     <div key={item.id} className="flex items-center gap-2">
                       <Checkbox
                         checked={item.completed}
-                        onCheckedChange={() => handleToggleChecklistItem(item.id)}
+                        onCheckedChange={() =>
+                          handleToggleChecklistItem(item.id)
+                        }
                       />
-                      <span className={`flex-1 text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}>
+                      <span
+                        className={`flex-1 text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}
+                      >
                         {item.title}
                       </span>
                       <Button
@@ -1222,10 +1454,16 @@ export default function ProjectBoard() {
                       placeholder="Add checklist item..."
                       value={newChecklistItem}
                       onChange={(e) => setNewChecklistItem(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAddChecklistItem()}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && handleAddChecklistItem()
+                      }
                       className="flex-1"
                     />
-                    <Button variant="outline" size="sm" onClick={handleAddChecklistItem}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddChecklistItem}
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1240,9 +1478,14 @@ export default function ProjectBoard() {
                 </label>
                 <div className="space-y-2 mt-2">
                   {editTaskAttachments.map((att) => (
-                    <div key={att.id} className="flex items-center gap-2 p-2 bg-muted rounded">
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 p-2 bg-muted rounded"
+                    >
                       {getFileIcon(att.type)}
-                      <span className="flex-1 text-sm truncate">{att.name}</span>
+                      <span className="flex-1 text-sm truncate">
+                        {att.name}
+                      </span>
                       <span className="text-xs text-muted-foreground">
                         {(att.size / 1024).toFixed(1)}KB
                       </span>
@@ -1264,14 +1507,21 @@ export default function ProjectBoard() {
                         onChange={handleFileUpload}
                         disabled={isUploading}
                       />
-                      <Button variant="outline" size="sm" disabled={isUploading} asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUploading}
+                        asChild
+                      >
                         <span>
                           <Upload className="h-4 w-4 mr-2" />
                           {isUploading ? "Uploading..." : "Upload File"}
                         </span>
                       </Button>
                     </label>
-                    <span className="text-xs text-muted-foreground ml-2">Max 10MB</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      Max 10MB
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1305,8 +1555,13 @@ export default function ProjectBoard() {
             <div className="space-y-3 py-4">
               {historyTask?.history && historyTask.history.length > 0 ? (
                 [...historyTask.history].reverse().map((entry, index) => {
-                  const isStructured = typeof entry === "object" && entry !== null && "action" in entry;
-                  const historyEntry = isStructured ? entry as HistoryEntry : null;
+                  const isStructured =
+                    typeof entry === "object" &&
+                    entry !== null &&
+                    "action" in entry;
+                  const historyEntry = isStructured
+                    ? (entry as HistoryEntry)
+                    : null;
                   const legacyEntry = !isStructured ? String(entry) : null;
 
                   return (
@@ -1318,7 +1573,9 @@ export default function ProjectBoard() {
                       <div className="flex-1 min-w-0">
                         {historyEntry ? (
                           <>
-                            <p className="text-sm font-medium">{historyEntry.action}</p>
+                            <p className="text-sm font-medium">
+                              {historyEntry.action}
+                            </p>
                             <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <UserIcon className="h-3 w-3" />
@@ -1326,11 +1583,18 @@ export default function ProjectBoard() {
                               </span>
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {new Date(historyEntry.timestamp).toLocaleDateString()}
+                                {new Date(
+                                  historyEntry.timestamp,
+                                ).toLocaleDateString()}
                               </span>
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {new Date(historyEntry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                {new Date(
+                                  historyEntry.timestamp,
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
                               </span>
                             </div>
                           </>
@@ -1342,7 +1606,9 @@ export default function ProjectBoard() {
                   );
                 })
               ) : (
-                <p className="text-sm text-muted-foreground text-center">No history available</p>
+                <p className="text-sm text-muted-foreground text-center">
+                  No history available
+                </p>
               )}
             </div>
           </ScrollArea>

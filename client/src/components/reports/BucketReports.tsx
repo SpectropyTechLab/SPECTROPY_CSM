@@ -22,18 +22,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  FolderKanban,
-  ListTodo,
-  Clock,
-  AlertTriangle,
-} from "lucide-react";
+import { FolderKanban, ListTodo, Clock, AlertTriangle } from "lucide-react";
 import type { Project, Task } from "@shared/schema";
 
-const COLORS = ["#4f46e5", "#22d3ee", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+const COLORS = [
+  "#4f46e5",
+  "#22d3ee",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+];
 
 interface Bucket {
   id: number;
+  title: string;
   name: string;
   projectId: number;
   position: number;
@@ -66,9 +69,10 @@ export default function BucketReports({
     queryKey: ["/api/buckets"],
   });
 
-  const filteredBuckets = selectedProjectFilter === "all"
-    ? buckets
-    : buckets.filter((b) => String(b.projectId) === selectedProjectFilter);
+  const filteredBuckets =
+    selectedProjectFilter === "all"
+      ? buckets
+      : buckets.filter((b) => String(b.projectId) === selectedProjectFilter);
 
   const selectedBucket = buckets.find((b) => String(b.id) === selectedBucketId);
 
@@ -76,7 +80,10 @@ export default function BucketReports({
     if (String(t.bucketId) !== selectedBucketId) return false;
     if (!isAdmin) {
       const assignedUsers = t.assignedUsers || [];
-      if (!assignedUsers.includes(currentUserId) && t.assigneeId !== currentUserId) {
+      if (
+        !assignedUsers.includes(currentUserId) &&
+        t.assigneeId !== currentUserId
+      ) {
         return false;
       }
     }
@@ -93,20 +100,39 @@ export default function BucketReports({
   const estimatedMinutes = bucketTasks.reduce((sum, t) => {
     return sum + (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
   }, 0);
-  const avgTimePerTask = totalInBucket > 0 ? Math.round(estimatedMinutes / totalInBucket) : 0;
+  const avgTimePerTask =
+    totalInBucket > 0 ? Math.round(estimatedMinutes / totalInBucket) : 0;
   const avgHours = Math.floor(avgTimePerTask / 60);
   const avgMins = avgTimePerTask % 60;
 
   const statusData = [
-    { status: "Not Started", count: bucketTasks.filter((t) => t.status === "todo").length },
-    { status: "In Progress", count: bucketTasks.filter((t) => t.status === "in_progress").length },
-    { status: "Completed", count: bucketTasks.filter((t) => t.status === "completed").length },
+    {
+      status: "Not Started",
+      count: bucketTasks.filter((t) => t.status === "todo").length,
+    },
+    {
+      status: "In Progress",
+      count: bucketTasks.filter((t) => t.status === "in_progress").length,
+    },
+    {
+      status: "Completed",
+      count: bucketTasks.filter((t) => t.status === "completed").length,
+    },
   ];
 
   const priorityData = [
-    { priority: "High", count: bucketTasks.filter((t) => t.priority === "high").length },
-    { priority: "Medium", count: bucketTasks.filter((t) => t.priority === "medium").length },
-    { priority: "Low", count: bucketTasks.filter((t) => t.priority === "low").length },
+    {
+      priority: "High",
+      count: bucketTasks.filter((t) => t.priority === "high").length,
+    },
+    {
+      priority: "Medium",
+      count: bucketTasks.filter((t) => t.priority === "medium").length,
+    },
+    {
+      priority: "Low",
+      count: bucketTasks.filter((t) => t.priority === "low").length,
+    },
   ];
 
   const isLoading = tasksLoading || bucketsLoading;
@@ -118,9 +144,17 @@ export default function BucketReports({
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Filter by Project</label>
-                <Select value={selectedProjectFilter} onValueChange={onProjectFilterChange}>
-                  <SelectTrigger className="w-[200px]" data-testid="select-bucket-project-filter">
+                <label className="text-sm font-medium text-muted-foreground">
+                  Filter by Project
+                </label>
+                <Select
+                  value={selectedProjectFilter}
+                  onValueChange={onProjectFilterChange}
+                >
+                  <SelectTrigger
+                    className="w-[200px]"
+                    data-testid="select-bucket-project-filter"
+                  >
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -134,15 +168,20 @@ export default function BucketReports({
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-muted-foreground">Select Bucket</label>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Select Bucket
+                </label>
                 <Select value={selectedBucketId} onValueChange={onBucketChange}>
-                  <SelectTrigger className="w-[200px]" data-testid="select-bucket-report">
+                  <SelectTrigger
+                    className="w-[200px]"
+                    data-testid="select-bucket-report"
+                  >
                     <SelectValue placeholder="Choose a bucket..." />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredBuckets.map((bucket) => (
                       <SelectItem key={bucket.id} value={String(bucket.id)}>
-                        {bucket.name}
+                        {bucket.title}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -164,9 +203,17 @@ export default function BucketReports({
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Filter by Project</label>
-              <Select value={selectedProjectFilter} onValueChange={onProjectFilterChange}>
-                <SelectTrigger className="w-[200px]" data-testid="select-bucket-project-filter">
+              <label className="text-sm font-medium text-muted-foreground">
+                Filter by Project
+              </label>
+              <Select
+                value={selectedProjectFilter}
+                onValueChange={onProjectFilterChange}
+              >
+                <SelectTrigger
+                  className="w-[200px]"
+                  data-testid="select-bucket-project-filter"
+                >
                   <SelectValue placeholder="All Projects" />
                 </SelectTrigger>
                 <SelectContent>
@@ -180,15 +227,20 @@ export default function BucketReports({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Select Bucket</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Select Bucket
+              </label>
               <Select value={selectedBucketId} onValueChange={onBucketChange}>
-                <SelectTrigger className="w-[200px]" data-testid="select-bucket-report">
+                <SelectTrigger
+                  className="w-[200px]"
+                  data-testid="select-bucket-report"
+                >
                   <SelectValue placeholder="Choose a bucket..." />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredBuckets.map((bucket) => (
                     <SelectItem key={bucket.id} value={String(bucket.id)}>
-                      {bucket.name}
+                      {bucket.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -235,7 +287,9 @@ export default function BucketReports({
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-destructive">{highPriority}</div>
+                <div className="text-2xl font-bold text-destructive">
+                  {highPriority}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Need attention
                 </p>
@@ -250,7 +304,9 @@ export default function BucketReports({
                 <Clock className="h-4 w-4 text-amber-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-600">{overdueTasks}</div>
+                <div className="text-2xl font-bold text-amber-600">
+                  {overdueTasks}
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Past deadline
                 </p>
@@ -265,7 +321,9 @@ export default function BucketReports({
                 <Clock className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{avgHours}h {avgMins}m</div>
+                <div className="text-2xl font-bold">
+                  {avgHours}h {avgMins}m
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Estimated average
                 </p>
@@ -301,19 +359,25 @@ export default function BucketReports({
                         paddingAngle={2}
                       >
                         {statusData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number, name: string) => [`${value} tasks`, name]}
+                        formatter={(value: number, name: string) => [
+                          `${value} tasks`,
+                          name,
+                        ]}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                         }}
                       />
-                      <Legend 
-                        layout="horizontal" 
-                        verticalAlign="bottom" 
+                      <Legend
+                        layout="horizontal"
+                        verticalAlign="bottom"
                         align="center"
                         wrapperStyle={{ paddingTop: 10 }}
                       />
@@ -337,7 +401,10 @@ export default function BucketReports({
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={priorityData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <BarChart
+                      data={priorityData}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="priority" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />

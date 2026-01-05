@@ -15,8 +15,10 @@ import { AlertCircle, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
+type AuthMode = "login" | "register" | "forgotPassword";
+
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [, setLocation] = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -26,9 +28,14 @@ const Auth = () => {
     name: "",
     email: "",
     password: "",
+    confirmPassword: "",
     role: "User",
     otp: "",
   });
+
+  const isLogin = authMode === "login";
+  const isRegister = authMode === "register";
+  const isForgotPassword = authMode === "forgotPassword";
 
   useEffect(() => {
     const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
@@ -101,10 +108,27 @@ const Auth = () => {
     },
     onSuccess: () => {
       setSuccess("Account created successfully. Please login.");
-      setIsLogin(true);
+      setAuthMode("login");
       setOtpSent(false);
       setOtpVerified(false);
-      setForm({ name: "", email: "", password: "", role: "User", otp: "" });
+      setForm({ name: "", email: "", password: "", confirmPassword: "", role: "User", otp: "" });
+    },
+    onError: (err: Error) => {
+      setError(err.message);
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (data: { email: string; otp: string; newPassword: string }) => {
+      const res = await apiRequest("POST", "/api/auth/reset-password", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      setSuccess("Password reset successfully. Please login with your new password.");
+      setAuthMode("login");
+      setOtpSent(false);
+      setOtpVerified(false);
+      setForm({ name: "", email: "", password: "", confirmPassword: "", role: "User", otp: "" });
     },
     onError: (err: Error) => {
       setError(err.message);
@@ -140,7 +164,7 @@ const Auth = () => {
 
     if (isLogin) {
       loginMutation.mutate({ email: form.email, password: form.password });
-    } else {
+    } else if (isRegister) {
       if (!otpVerified) {
         setError("Please verify your email with OTP first");
         return;
@@ -151,10 +175,37 @@ const Auth = () => {
         name: form.name,
         role: form.role,
       });
+    } else if (isForgotPassword) {
+      if (!otpVerified) {
+        setError("Please verify your email with OTP first");
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        setError("Passwords do not match");
+        return;
+      }
+      if (form.password.length < 6) {
+        setError("Password must be at least 6 characters");
+        return;
+      }
+      resetPasswordMutation.mutate({
+        email: form.email,
+        otp: form.otp,
+        newPassword: form.password,
+      });
     }
   };
 
-  const isLoading = loginMutation.isPending || registerMutation.isPending;
+  const switchMode = (mode: AuthMode) => {
+    setAuthMode(mode);
+    setError(null);
+    setSuccess(null);
+    setOtpSent(false);
+    setOtpVerified(false);
+    setForm({ name: "", email: "", password: "", confirmPassword: "", role: "User", otp: "" });
+  };
+
+  const isLoading = loginMutation.isPending || registerMutation.isPending || resetPasswordMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -164,12 +215,14 @@ const Auth = () => {
             className="text-2xl font-bold text-center text-primary"
             data-testid="text-auth-title"
           >
-            {isLogin ? "Login to Spectropy PMS" : "Register for Spectropy PMS"}
+            {isLogin && "Login to Spectropy PMS"}
+            {isRegister && "Register for Spectropy PMS"}
+            {isForgotPassword && "Reset Your Password"}
           </CardTitle>
           <CardDescription className="text-center text-slate-400">
-            {isLogin
-              ? "Enter your credentials to access your workspace"
-              : "Create an account to get started with your projects"}
+            {isLogin && "Enter your credentials to access your workspace"}
+            {isRegister && "Create an account to get started with your projects"}
+            {isForgotPassword && "Verify your email and set a new password"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -195,23 +248,21 @@ const Auth = () => {
               </Alert>
             )}
 
-            {!isLogin && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-700">
-                    Full Name
-                  </Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="John Doe"
-                    onChange={handleChange}
-                    value={form.name}
-                    className="border-slate-300"
-                    data-testid="input-name"
-                  />
-                </div>
-              </>
+            {isRegister && (
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-slate-700">
+                  Full Name
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="John Doe"
+                  onChange={handleChange}
+                  value={form.name}
+                  className="border-slate-300"
+                  data-testid="input-name"
+                />
+              </div>
             )}
 
             <div className="space-y-2">
@@ -227,28 +278,12 @@ const Auth = () => {
                 onChange={handleChange}
                 value={form.email}
                 className="border-slate-300"
+                disabled={isForgotPassword && otpVerified}
                 data-testid="input-email"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700">
-                Password
-              </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Enter password"
-                required
-                onChange={handleChange}
-                value={form.password}
-                className="border-slate-300"
-                data-testid="input-password"
-              />
-            </div>
-
-            {!isLogin && (
+            {(isRegister || isForgotPassword) && (
               <div className="space-y-2">
                 <Label htmlFor="otp" className="text-slate-700">
                   Email Verification (OTP)
@@ -304,65 +339,123 @@ const Auth = () => {
                 </div>
                 {otpSent && !otpVerified && (
                   <p className="text-xs text-slate-500">
-                    Check server console for the OTP code.
+                    Check your email for the OTP code.
                   </p>
                 )}
+              </div>
+            )}
+
+            {(isLogin || isRegister || (isForgotPassword && otpVerified)) && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-slate-700">
+                  {isForgotPassword ? "New Password" : "Password"}
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder={isForgotPassword ? "Enter new password" : "Enter password"}
+                  required
+                  onChange={handleChange}
+                  value={form.password}
+                  className="border-slate-300"
+                  data-testid="input-password"
+                />
+              </div>
+            )}
+
+            {isForgotPassword && otpVerified && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-slate-700">
+                  Confirm New Password
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="Confirm new password"
+                  required
+                  onChange={handleChange}
+                  value={form.confirmPassword}
+                  className="border-slate-300"
+                  data-testid="input-confirm-password"
+                />
+              </div>
+            )}
+
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgotPassword")}
+                  className="text-sm text-accent hover:underline transition-colors"
+                  data-testid="button-forgot-password"
+                >
+                  Forgot Password?
+                </button>
               </div>
             )}
 
             <Button
               type="submit"
               className="w-full bg-primary hover:bg-indigo-600 text-white font-semibold h-11 transition-all"
-              disabled={isLoading || (!isLogin && !otpVerified)}
+              disabled={isLoading || (isRegister && !otpVerified) || (isForgotPassword && !otpVerified)}
               data-testid="button-submit"
             >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {isLogin ? "Sign In" : "Create Account"}
+              {isLogin && "Sign In"}
+              {isRegister && "Create Account"}
+              {isForgotPassword && "Reset Password"}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm text-slate-500">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError(null);
-                setSuccess(null);
-                setOtpSent(false);
-                setOtpVerified(false);
-              }}
-              className="text-accent hover:underline font-medium transition-colors"
-              data-testid="button-toggle-auth-mode"
-            >
-              {isLogin ? "Register here" : "Login here"}
-            </button>
+            {isLogin && (
+              <>
+                Don't have an account?{" "}
+                <button
+                  onClick={() => switchMode("register")}
+                  className="text-accent hover:underline font-medium transition-colors"
+                  data-testid="button-toggle-auth-mode"
+                >
+                  Register here
+                </button>
+              </>
+            )}
+            {isRegister && (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => switchMode("login")}
+                  className="text-accent hover:underline font-medium transition-colors"
+                  data-testid="button-toggle-auth-mode"
+                >
+                  Login here
+                </button>
+              </>
+            )}
+            {isForgotPassword && (
+              <>
+                Remember your password?{" "}
+                <button
+                  onClick={() => switchMode("login")}
+                  className="text-accent hover:underline font-medium transition-colors"
+                  data-testid="button-back-to-login"
+                >
+                  Back to Login
+                </button>
+              </>
+            )}
           </div>
           <Button
             variant="ghost"
             onClick={() => setLocation("/")}
-            className="mb-4 text-slate-500 hover:text-primary self-start ml-0  flex items-center gap-2 w-full justify-center"
+            className="mb-4 text-slate-500 hover:text-primary self-start ml-0 flex items-center gap-2 w-full justify-center mt-2"
             data-testid="button-back-to-welcome"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Welcome
           </Button>
-          {isLogin && (
-            <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-xs text-slate-500 text-center">
-                Test Credentials:
-                <br />
-                <span className="font-mono">
-                  admin@spectropy.com / admin123
-                </span>{" "}
-                (Admin)
-                <br />
-                <span className="font-mono">
-                  user@spectropy.com / user123
-                </span>{" "}
-                (User)
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
