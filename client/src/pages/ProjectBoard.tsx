@@ -1102,7 +1102,7 @@ export default function ProjectBoard() {
 
       {/* New Task Dialog */}
       <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
-        <DialogContent className="max-w-lg w-[95vw] sm:w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-lg w-[95vw] sm:w-full max-h-[90vh] overflow-scroll flex flex-col">
           <DialogHeader>
             <DialogTitle>Add New Task</DialogTitle>
           </DialogHeader>
