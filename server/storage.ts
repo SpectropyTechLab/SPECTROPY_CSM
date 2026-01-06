@@ -1,16 +1,17 @@
 import { db } from "./db";
 import {
-  users, projects, tasks, buckets, notifications,
+  users, projects, tasks, buckets, notifications, activityLogs,
   type User, type InsertUser,
   type Project, type InsertProject,
   type Bucket, type InsertBucket,
   type Task, type InsertTask,
   type Notification, type InsertNotification,
+  type ActivityLog, type InsertActivityLog,
   type UpdateProjectRequest,
   type UpdateBucketRequest,
   type UpdateTaskRequest
 } from "@shared/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -48,6 +49,10 @@ export interface IStorage {
   // Notifications
   createNotification(notification: InsertNotification): Promise<Notification>;
   getNotifications(userId: number): Promise<Notification[]>;
+
+  // Activity Logs
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  getActivityLogs(): Promise<ActivityLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -203,6 +208,16 @@ export class DatabaseStorage implements IStorage {
 
   async getNotifications(userId: number): Promise<Notification[]> {
     return await db.select().from(notifications).where(eq(notifications.userId, userId));
+  }
+
+  // Activity Logs
+  async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
+    const [log] = await db.insert(activityLogs).values(insertLog).returning();
+    return log;
+  }
+
+  async getActivityLogs(): Promise<ActivityLog[]> {
+    return await db.select().from(activityLogs).orderBy(desc(activityLogs.createdAt));
   }
 }
 
