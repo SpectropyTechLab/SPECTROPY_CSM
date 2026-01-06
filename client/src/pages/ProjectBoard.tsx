@@ -59,6 +59,7 @@ import {
   File,
   Users,
   ChevronDown,
+  Copy,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type {
@@ -395,6 +396,64 @@ export default function ProjectBoard() {
     e.stopPropagation();
     setHistoryTask(task);
     setIsHistoryOpen(true);
+  };
+
+  const handleCloneTask = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canCreateTask) {
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to create tasks",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const bucketTasks = tasks.filter((t) => t.bucketId === task.bucketId);
+    const maxPosition = Math.max(...bucketTasks.map((t) => t.position), -1);
+
+    createTaskMutation.mutate({
+      title: `${task.title} (Copy)`,
+      description: task.description,
+      priority: task.priority,
+      projectId: task.projectId,
+      bucketId: task.bucketId,
+      assigneeId: task.assigneeId,
+      assignedUsers: task.assignedUsers || [],
+      position: maxPosition + 1,
+      status: "todo",
+      startDate: task.startDate,
+      dueDate: task.dueDate,
+      estimateHours: task.estimateHours || 0,
+      estimateMinutes: task.estimateMinutes || 0,
+      history: [createHistoryEntry(`Cloned from "${task.title}"`)],
+      checklist: task.checklist?.map((item) => ({
+        ...item,
+        id: crypto.randomUUID(),
+        completed: false,
+      })) || [],
+      attachments: [],
+    });
+
+    toast({
+      title: "Task cloned",
+      description: `"${task.title}" has been duplicated`,
+    });
+  };
+
+  const handleToggleChecklistItemOnCard = (task: Task, itemId: string) => {
+    if (!canUpdateTask && !canCompleteTask) {
+      return;
+    }
+
+    const updatedChecklist = task.checklist?.map((item) =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    ) || [];
+
+    updateTaskMutation.mutate({
+      id: task.id,
+      checklist: updatedChecklist,
+    });
   };
 
   const isAssignedToTask = (task: Task): boolean => {
@@ -924,6 +983,13 @@ export default function ProjectBoard() {
                                     <History className="h-4 w-4 mr-2" />
                                     View History
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleCloneTask(task, e)}
+                                    data-testid={`button-clone-task-${task.id}`}
+                                  >
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Clone Task
+                                  </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
                                     className="text-destructive"
@@ -1035,6 +1101,44 @@ export default function ProjectBoard() {
                                 value={checklistProgress.percentage}
                                 className="h-1 mt-2"
                               />
+                            )}
+
+                            {task.checklist && task.checklist.length > 0 && (
+                              <div
+                                className="mt-2 space-y-1"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {task.checklist.slice(0, 3).map((item) => (
+                                  <div
+                                    key={item.id}
+                                    className="flex items-center gap-2"
+                                    data-testid={`checklist-item-card-${item.id}`}
+                                  >
+                                    <Checkbox
+                                      checked={item.completed}
+                                      onCheckedChange={() =>
+                                        handleToggleChecklistItemOnCard(task, item.id)
+                                      }
+                                      className="h-3.5 w-3.5"
+                                      data-testid={`checkbox-checklist-${item.id}`}
+                                    />
+                                    <span
+                                      className={`text-xs truncate ${
+                                        item.completed
+                                          ? "line-through text-muted-foreground"
+                                          : ""
+                                      }`}
+                                    >
+                                      {item.title}
+                                    </span>
+                                  </div>
+                                ))}
+                                {task.checklist.length > 3 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    +{task.checklist.length - 3} more items
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             {(task.startDate || task.dueDate) && (

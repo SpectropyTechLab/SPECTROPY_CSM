@@ -2,16 +2,27 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  FolderKanban, 
-  CheckSquare, 
-  Clock, 
+import {
+  FolderKanban,
+  CheckSquare,
+  Clock,
   TrendingUp,
-  ArrowRight 
+  ArrowRight,
 } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 import type { Project, Task } from "@shared/schema";
 
 export default function UserDashboard() {
@@ -27,15 +38,23 @@ export default function UserDashboard() {
     enabled: !!userId,
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<
+    Project[]
+  >({
     queryKey: ["/api/projects"],
   });
   const completedTasks = myTasks.filter((task) => task.status === "completed");
   const pendingTasks = myTasks.filter((task) => task.status === "todo");
-  const inProgressTasks = myTasks.filter((task) => task.status === "in_progress");
+  const inProgressTasks = myTasks.filter(
+    (task) => task.status === "in_progress",
+  );
 
-  const myProjectIds = Array.from(new Set(myTasks.map((task) => task.projectId)));
-  const myProjects = projects.filter((project) => myProjectIds.includes(project.id));
+  const myProjectIds = Array.from(
+    new Set(myTasks.map((task) => task.projectId)),
+  );
+  const myProjects = projects.filter((project) =>
+    myProjectIds.includes(project.id),
+  );
 
   const taskStatusData = [
     { name: "Completed", value: completedTasks.length, color: "#10b981" },
@@ -45,10 +64,15 @@ export default function UserDashboard() {
 
   const projectProgressData = myProjects.map((project) => {
     const projectTasks = myTasks.filter((t) => t.projectId === project.id);
-    const completed = projectTasks.filter((t) => t.status === "completed").length;
+    const completed = projectTasks.filter(
+      (t) => t.status === "completed",
+    ).length;
     const total = projectTasks.length;
     return {
-      name: project.name.length > 15 ? project.name.substring(0, 15) + "..." : project.name,
+      name:
+        project.name.length > 15
+          ? project.name.substring(0, 15) + "..."
+          : project.name,
       completed,
       pending: total - completed,
       percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
@@ -75,7 +99,10 @@ export default function UserDashboard() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900" data-testid="text-welcome">
+          <h1
+            className="text-3xl font-display font-bold text-slate-900"
+            data-testid="text-welcome"
+          >
             Welcome back, {userName}!
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -121,7 +148,10 @@ export default function UserDashboard() {
               <CheckSquare className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-total-tasks">
+              <div
+                className="text-2xl font-bold"
+                data-testid="stat-total-tasks"
+              >
                 {myTasks.length}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -144,11 +174,17 @@ export default function UserDashboard() {
               <TrendingUp className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-emerald-600" data-testid="stat-completed">
+              <div
+                className="text-2xl font-bold text-emerald-600"
+                data-testid="stat-completed"
+              >
                 {completedTasks.length}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {myTasks.length > 0 ? Math.round((completedTasks.length / myTasks.length) * 100) : 0}% completion rate
+                {myTasks.length > 0
+                  ? Math.round((completedTasks.length / myTasks.length) * 100)
+                  : 0}
+                % completion rate
               </p>
             </CardContent>
           </Card>
@@ -167,7 +203,10 @@ export default function UserDashboard() {
               <Clock className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="stat-estimated-time">
+              <div
+                className="text-2xl font-bold"
+                data-testid="stat-estimated-time"
+              >
                 {totalEstimatedHours.toFixed(1)}h
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -186,13 +225,16 @@ export default function UserDashboard() {
         >
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Task Status Distribution</CardTitle>
+              <CardTitle className="text-lg">
+                Task Status Distribution
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {myTasks.length > 0 ? (
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <Pie
+                      className="text-xs"
                       data={taskStatusData}
                       cx="50%"
                       cy="50%"
@@ -200,7 +242,9 @@ export default function UserDashboard() {
                       outerRadius={100}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
                     >
                       {taskStatusData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -232,11 +276,26 @@ export default function UserDashboard() {
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={projectProgressData} layout="vertical">
                     <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={100}
+                      tick={{ fontSize: 12 }}
+                    />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="completed" stackId="a" fill="#10b981" name="Completed" />
-                    <Bar dataKey="pending" stackId="a" fill="#e2e8f0" name="Pending" />
+                    <Bar
+                      dataKey="completed"
+                      stackId="a"
+                      fill="#10b981"
+                      name="Completed"
+                    />
+                    <Bar
+                      dataKey="pending"
+                      stackId="a"
+                      fill="#e2e8f0"
+                      name="Pending"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -266,15 +325,24 @@ export default function UserDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {myProjects.slice(0, 3).map((project) => {
-                const projectTasks = myTasks.filter((t) => t.projectId === project.id);
-                const completed = projectTasks.filter((t) => t.status === "completed").length;
-                const percentage = projectTasks.length > 0 ? Math.round((completed / projectTasks.length) * 100) : 0;
-                
+                const projectTasks = myTasks.filter(
+                  (t) => t.projectId === project.id,
+                );
+                const completed = projectTasks.filter(
+                  (t) => t.status === "completed",
+                ).length;
+                const percentage =
+                  projectTasks.length > 0
+                    ? Math.round((completed / projectTasks.length) * 100)
+                    : 0;
+
                 return (
                   <Link key={project.id} href={`/user/projects/${project.id}`}>
                     <div className="p-3 rounded-lg border border-slate-200 hover-elevate cursor-pointer">
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="font-medium text-sm truncate">{project.name}</span>
+                        <span className="font-medium text-sm truncate">
+                          {project.name}
+                        </span>
                         <Badge variant="secondary" className="text-xs">
                           {project.status}
                         </Badge>
@@ -317,11 +385,15 @@ export default function UserDashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {myTasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-200">
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-200"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{task.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {task.estimateHours || 0}h {task.estimateMinutes || 0}m estimated
+                      {task.estimateHours || 0}h {task.estimateMinutes || 0}m
+                      estimated
                     </p>
                   </div>
                   <Badge
@@ -330,11 +402,15 @@ export default function UserDashboard() {
                       task.status === "completed"
                         ? "bg-emerald-100 text-emerald-700"
                         : task.status === "in_progress"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-slate-100 text-slate-700"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-slate-100 text-slate-700"
                     }
                   >
-                    {task.status === "in_progress" ? "In Progress" : task.status === "completed" ? "Done" : "Todo"}
+                    {task.status === "in_progress"
+                      ? "In Progress"
+                      : task.status === "completed"
+                        ? "Done"
+                        : "Todo"}
                   </Badge>
                 </div>
               ))}
