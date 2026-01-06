@@ -175,19 +175,19 @@ export async function registerRoutes(
         startDate: new Date(),
       });
 
-      console.log(`Logging project creation: ${project.name}`);
-      const logData = {
-        entityType: "project",
-        entityId: project.id,
-        entityName: project.name,
-        action: "created",
-        performedBy: currentUser.id,
-        performedByName: currentUser.name,
-        payload: { projectId: project.id, name: project.name },
-      };
-      console.log("Activity log data:", JSON.stringify(logData));
-      const log = await storage.createActivityLog(logData);
-      console.log("Activity log created successfully:", log.id);
+      try {
+        await storage.createActivityLog({
+          entityType: "project",
+          entityId: project.id,
+          entityName: project.name,
+          action: "created",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: { projectId: project.id, name: project.name },
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for project creation:", logErr);
+      }
 
       res.status(201).json(project);
     } catch (err) {
@@ -207,11 +207,27 @@ export async function registerRoutes(
       
       const input = api.projects.update.input.parse(req.body);
       const userId = getCurrentUserId(req);
-
-      const project = await storage.updateProject(Number(req.params.id), {
+      const projectId = Number(req.params.id);
+      
+      const oldProject = await storage.getProject(projectId);
+      const project = await storage.updateProject(projectId, {
         ...input,
         lastModifiedBy: userId,
       });
+
+      try {
+        await storage.createActivityLog({
+          entityType: "project",
+          entityId: project.id,
+          entityName: project.name,
+          action: "updated",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: { before: oldProject, after: project, changes: input },
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for project update:", logErr);
+      }
 
       res.json(project);
     } catch (err) {
@@ -238,23 +254,23 @@ export async function registerRoutes(
       const projectTasks = await storage.getTasks(projectId);
       const projectBuckets = await storage.getBuckets(projectId);
 
-      console.log(`Logging project deletion: ${project.name}`);
-      const logData = {
-        entityType: "project",
-        entityId: projectId,
-        entityName: project.name,
-        action: "deleted",
-        performedBy: currentUser.id,
-        performedByName: currentUser.name,
-        payload: JSON.parse(JSON.stringify({ 
-          project,
-          tasks: projectTasks,
-          buckets: projectBuckets,
-        })),
-      };
-      console.log("Activity log data:", JSON.stringify(logData));
-      const log = await storage.createActivityLog(logData);
-      console.log("Activity log created successfully:", log.id);
+      try {
+        await storage.createActivityLog({
+          entityType: "project",
+          entityId: projectId,
+          entityName: project.name,
+          action: "deleted",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: JSON.parse(JSON.stringify({ 
+            project,
+            tasks: projectTasks,
+            buckets: projectBuckets,
+          })),
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for project deletion:", logErr);
+      }
 
       await storage.updateProject(projectId, { status: "deleted" });
       res.status(204).send();
