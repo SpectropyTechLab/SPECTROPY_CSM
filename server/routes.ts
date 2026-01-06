@@ -147,7 +147,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Projects
   app.get(api.projects.list.path, async (req, res) => {
-    const projects = await storage.getProjects();
+    const allProjects = await storage.getProjects();
+    const projects = allProjects.filter(p => p.status !== "deleted");
     res.json(projects);
   });
 
@@ -173,6 +174,17 @@ export async function registerRoutes(
         lastModifiedBy: userId,
         startDate: new Date(),
       });
+
+      await storage.createActivityLog({
+        entityType: "project",
+        entityId: project.id,
+        entityName: project.name,
+        action: "created",
+        performedBy: currentUser.id,
+        performedByName: currentUser.name,
+        payload: { projectId: project.id, name: project.name },
+      });
+
       res.status(201).json(project);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -213,7 +225,30 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete projects" });
       }
       
-      await storage.deleteProject(Number(req.params.id));
+      const projectId = Number(req.params.id);
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const projectTasks = await storage.getTasks(projectId);
+      const projectBuckets = await storage.getBuckets(projectId);
+
+      await storage.createActivityLog({
+        entityType: "project",
+        entityId: projectId,
+        entityName: project.name,
+        action: "deleted",
+        performedBy: currentUser.id,
+        performedByName: currentUser.name,
+        payload: { 
+          project,
+          tasks: projectTasks,
+          buckets: projectBuckets,
+        },
+      });
+
+      await storage.updateProject(projectId, { status: "deleted" });
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to delete project" });
@@ -1006,6 +1041,21 @@ export async function registerRoutes(
       res.json({ completedTask: task, newTask: null });
     } catch (err) {
       res.status(500).json({ message: "Failed to progress task" });
+    }
+  });
+
+  // Activity Logs
+  app.get("/api/logs", async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || currentUser.role !== "Admin") {
+        return res.status(403).json({ error: "Permission denied", message: "Only admins can view activity logs" });
+      }
+      
+      const logs = await storage.getActivityLogs();
+      res.json(logs);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch activity logs" });
     }
   });
 
