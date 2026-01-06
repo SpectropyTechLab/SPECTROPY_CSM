@@ -38,6 +38,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const adminNavItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Projects", href: "/projects", icon: FolderKanban },
+    { label: "Tasks", href: "/tasks", icon: CheckSquare },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "User Management", href: "/users", icon: Shield },
   ];

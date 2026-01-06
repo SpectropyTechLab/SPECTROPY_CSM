@@ -16,6 +16,7 @@ import UserTasks from "@/pages/UserTasks";
 import Account from "@/pages/Account";
 import Settings from "@/pages/Settings";
 import UserManagement from "@/pages/UserManagement";
+import AdminTasks from "@/pages/AdminTasks";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 
@@ -58,6 +59,13 @@ function Router() {
         <ProtectedRoute role="Admin">
           <Layout>
             <UserManagement />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tasks">
+        <ProtectedRoute role="Admin">
+          <Layout>
+            <AdminTasks />
           </Layout>
         </ProtectedRoute>
       </Route>
