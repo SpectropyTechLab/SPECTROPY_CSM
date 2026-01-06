@@ -21,12 +21,14 @@ import {
   Clock,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import type { ActivityLog } from "@shared/schema";
 
 export default function Logs() {
   const { data: logs = [], isLoading } = useQuery<ActivityLog[]>({
     queryKey: ["/api/logs"],
+    refetchInterval: 5000,
   });
 
   const getActionIcon = (action: string) => {
@@ -98,9 +100,19 @@ export default function Logs() {
               <ScrollText className="h-5 w-5 text-primary" />
               Recent Activity
             </CardTitle>
-            <Badge variant="outline" className="font-normal">
-              {logs.length} entries
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/logs"] })}
+                className="h-8"
+              >
+                Refresh
+              </Button>
+              <Badge variant="outline" className="font-normal">
+                {logs.length} entries
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent>
             {logs.length === 0 ? (
@@ -125,7 +137,7 @@ export default function Logs() {
                       <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
                         <TableCell className="text-slate-500 text-sm">
                           {log.createdAt
-                            ? format(new Date(log.createdAt), "MMM d, yyyy h:mm a")
+                            ? format(new Date(log.createdAt), "MMM d, yyyy h:mm:ss a")
                             : "-"}
                         </TableCell>
                         <TableCell>
