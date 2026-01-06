@@ -231,6 +231,20 @@ export default function ProjectBoard() {
     },
   });
 
+  const deleteBucketMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/buckets/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/buckets", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
+      toast({
+        title: "Bucket deleted",
+        description: "The bucket and all its tasks have been removed",
+      });
+    },
+  });
+
   const resetNewTaskForm = () => {
     setNewTaskTitle("");
     setNewTaskDescription("");
@@ -248,6 +262,25 @@ export default function ProjectBoard() {
       return;
     }
     updateBucketMutation.mutate({ id: bucketId, title: editingBucketTitle });
+  };
+
+  const handleDeleteBucket = (bucket: BucketWithTasks) => {
+    if (!canDeleteTask) {
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to delete buckets",
+        variant: "destructive",
+      });
+      return;
+    }
+    const taskCount = bucket.tasks.length;
+    const message = taskCount > 0
+      ? `Are you sure you want to delete "${bucket.title}" and its ${taskCount} task${taskCount > 1 ? 's' : ''}?`
+      : `Are you sure you want to delete "${bucket.title}"?`;
+    
+    if (confirm(message)) {
+      deleteBucketMutation.mutate(bucket.id);
+    }
   };
 
   const bucketsWithTasks: BucketWithTasks[] = buckets.map((bucket) => ({
@@ -864,28 +897,62 @@ export default function ProjectBoard() {
                     {bucket.tasks.length}
                   </Badge>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => {
-                    if (!canCreateTask) {
-                      toast({
-                        title: "Permission denied",
-                        description:
-                          "You do not have permission to create tasks",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    setSelectedBucketId(bucket.id);
-                    setIsNewTaskOpen(true);
-                  }}
-                  disabled={!canCreateTask}
-                  data-testid={`button-add-task-${bucket.id}`}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      if (!canCreateTask) {
+                        toast({
+                          title: "Permission denied",
+                          description:
+                            "You do not have permission to create tasks",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      setSelectedBucketId(bucket.id);
+                      setIsNewTaskOpen(true);
+                    }}
+                    disabled={!canCreateTask}
+                    data-testid={`button-add-task-${bucket.id}`}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        data-testid={`button-bucket-menu-${bucket.id}`}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setEditingBucketId(bucket.id);
+                          setEditingBucketTitle(bucket.title);
+                        }}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Rename Bucket
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteBucket(bucket)}
+                        data-testid={`button-delete-bucket-${bucket.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Bucket
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               <div
