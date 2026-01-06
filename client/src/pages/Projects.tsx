@@ -38,7 +38,7 @@ import {
   Loader2,
   MoreVertical,
   Pencil,
-  Archive,
+  Trash2,
   Type,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -102,15 +102,15 @@ const Projects = () => {
     },
   });
 
-  const archiveProjectMutation = useMutation({
+  const deleteProjectMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("PATCH", `/api/projects/${id}`, { status: "archived" });
+      return apiRequest("DELETE", `/api/projects/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       toast({
-        title: "Project archived",
-        description: "Project has been archived.",
+        title: "Project deleted",
+        description: "Project has been deleted.",
       });
     },
   });
@@ -149,8 +149,8 @@ const Projects = () => {
     updateProjectMutation.mutate({ id: projectId, name: inlineTitle });
   };
 
-  const handleArchiveProject = (projectId: number) => {
-    archiveProjectMutation.mutate(projectId);
+  const handleDeleteProject = (projectId: number) => {
+    deleteProjectMutation.mutate(projectId);
   };
 
   const getProjectTaskCount = (projectId: number) => {
@@ -312,12 +312,12 @@ const Projects = () => {
                             className="text-red-600 focus:text-red-600"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleArchiveProject(project.id);
+                              handleDeleteProject(project.id);
                             }}
-                            data-testid={`button-archive-project-${project.id}`}
+                            data-testid={`button-delete-project-${project.id}`}
                           >
-                            <Archive className="h-4 w-4 mr-2" />
-                            Archive Project
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Project
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
