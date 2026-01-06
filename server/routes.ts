@@ -147,15 +147,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Projects
   app.get(api.projects.list.path, async (req, res) => {
-    try {
-      const allProjects = await storage.getProjects();
-      const projects = allProjects.filter(p => p.status !== "deleted");
-      console.log(`Returning ${projects.length} active projects out of ${allProjects.length} total`);
-      res.json(projects);
-    } catch (err) {
-      console.error("Failed to list projects:", err);
-      res.status(500).json({ message: "Failed to list projects" });
-    }
+    const allProjects = await storage.getProjects();
+    const projects = allProjects.filter(p => p.status !== "deleted");
+    res.json(projects);
   });
 
   app.get(api.projects.get.path, async (req, res) => {
@@ -182,7 +176,7 @@ export async function registerRoutes(
       });
 
       console.log(`Logging project creation: ${project.name}`);
-      await storage.createActivityLog({
+      const logData = {
         entityType: "project",
         entityId: project.id,
         entityName: project.name,
@@ -190,8 +184,10 @@ export async function registerRoutes(
         performedBy: currentUser.id,
         performedByName: currentUser.name,
         payload: { projectId: project.id, name: project.name },
-      });
-      console.log("Activity log created successfully");
+      };
+      console.log("Activity log data:", JSON.stringify(logData));
+      const log = await storage.createActivityLog(logData);
+      console.log("Activity log created successfully:", log.id);
 
       res.status(201).json(project);
     } catch (err) {
@@ -243,7 +239,7 @@ export async function registerRoutes(
       const projectBuckets = await storage.getBuckets(projectId);
 
       console.log(`Logging project deletion: ${project.name}`);
-      await storage.createActivityLog({
+      const logData = {
         entityType: "project",
         entityId: projectId,
         entityName: project.name,
@@ -255,7 +251,10 @@ export async function registerRoutes(
           tasks: projectTasks,
           buckets: projectBuckets,
         })),
-      });
+      };
+      console.log("Activity log data:", JSON.stringify(logData));
+      const log = await storage.createActivityLog(logData);
+      console.log("Activity log created successfully:", log.id);
 
       await storage.updateProject(projectId, { status: "deleted" });
       res.status(204).send();
@@ -1061,9 +1060,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Permission denied", message: "Only admins can view activity logs" });
       }
       
-      console.log("Fetching activity logs for admin...");
       const logs = await storage.getActivityLogs();
-      console.log(`Found ${logs.length} logs`);
       res.json(logs);
     } catch (err) {
       console.error("Failed to fetch activity logs:", err);
