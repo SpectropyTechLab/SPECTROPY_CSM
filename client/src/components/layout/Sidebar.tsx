@@ -12,6 +12,7 @@ import {
   Shield,
   Menu,
   X,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,6 +42,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
     { label: "Tasks", href: "/tasks", icon: CheckSquare },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "User Management", href: "/users", icon: Shield },
+    { label: "Activity Logs", href: "/logs", icon: ScrollText },
   ];
 
   const userNavItems = [
