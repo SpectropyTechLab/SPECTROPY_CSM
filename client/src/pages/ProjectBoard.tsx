@@ -181,7 +181,8 @@ export default function ProjectBoard() {
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      return apiRequest("POST", "/api/tasks", data);
+      const res = await apiRequest("POST", "/api/tasks", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
@@ -398,7 +399,7 @@ export default function ProjectBoard() {
     setIsHistoryOpen(true);
   };
 
-  const handleCloneTask = (task: Task, e: React.MouseEvent) => {
+  const handleCloneTask = async (task: Task, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!canCreateTask) {
       toast({
@@ -412,33 +413,43 @@ export default function ProjectBoard() {
     const bucketTasks = tasks.filter((t) => t.bucketId === task.bucketId);
     const maxPosition = Math.max(...bucketTasks.map((t) => t.position), -1);
 
-    createTaskMutation.mutate({
-      title: `${task.title} (Copy)`,
-      description: task.description,
-      priority: task.priority,
-      projectId: task.projectId,
-      bucketId: task.bucketId,
-      assigneeId: task.assigneeId,
-      assignedUsers: task.assignedUsers || [],
-      position: maxPosition + 1,
-      status: "todo",
-      startDate: task.startDate,
-      dueDate: task.dueDate,
-      estimateHours: task.estimateHours || 0,
-      estimateMinutes: task.estimateMinutes || 0,
-      history: [createHistoryEntry(`Cloned from "${task.title}"`)],
-      checklist: task.checklist?.map((item) => ({
-        ...item,
-        id: crypto.randomUUID(),
-        completed: false,
-      })) || [],
-      attachments: [],
-    });
+    try {
+      const newTask = await createTaskMutation.mutateAsync({
+        title: `${task.title} (Copy)`,
+        description: task.description,
+        priority: task.priority,
+        projectId: task.projectId,
+        bucketId: task.bucketId,
+        assigneeId: task.assigneeId,
+        assignedUsers: task.assignedUsers || [],
+        position: maxPosition + 1,
+        status: "todo",
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+        estimateHours: task.estimateHours || 0,
+        estimateMinutes: task.estimateMinutes || 0,
+        history: [createHistoryEntry(`Cloned from "${task.title}"`)],
+        checklist: task.checklist?.map((item) => ({
+          ...item,
+          id: crypto.randomUUID(),
+          completed: false,
+        })) || [],
+        attachments: [],
+      });
 
-    toast({
-      title: "Task cloned",
-      description: `"${task.title}" has been duplicated`,
-    });
+      toast({
+        title: "Task cloned",
+        description: `"${task.title}" has been duplicated - edit panel opened`,
+      });
+
+      handleOpenEditTask(newTask);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clone task",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleToggleChecklistItemOnCard = (task: Task, itemId: string) => {
