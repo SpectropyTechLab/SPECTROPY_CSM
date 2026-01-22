@@ -21,24 +21,24 @@ export function hasAnyPermission(user: { role: string; permissions: Permission[]
 export function createPermissionMiddleware(requiredPermission: Permission) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = getCurrentUserId(req);
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
-    
+
     try {
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      
+
       if (hasPermission(user, requiredPermission)) {
         return next();
       }
-      
-      return res.status(403).json({ 
-        error: "Permission denied", 
+
+      return res.status(403).json({
+        error: "Permission denied",
         required: requiredPermission,
         message: `You do not have the required permission: ${requiredPermission}`
       });
@@ -52,24 +52,24 @@ export function createPermissionMiddleware(requiredPermission: Permission) {
 export function createAnyPermissionMiddleware(requiredPermissions: Permission[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = getCurrentUserId(req);
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
-    
+
     try {
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      
+
       if (hasAnyPermission(user, requiredPermissions)) {
         return next();
       }
-      
-      return res.status(403).json({ 
-        error: "Permission denied", 
+
+      return res.status(403).json({
+        error: "Permission denied",
         required: requiredPermissions,
         message: `You do not have any of the required permissions: ${requiredPermissions.join(", ")}`
       });
@@ -83,23 +83,23 @@ export function createAnyPermissionMiddleware(requiredPermissions: Permission[])
 export function requireAdmin() {
   return async (req: Request, res: Response, next: NextFunction) => {
     const userId = getCurrentUserId(req);
-    
+
     if (!userId) {
       return res.status(401).json({ error: "Authentication required" });
     }
-    
+
     try {
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(401).json({ error: "User not found" });
       }
-      
+
       if (user.role === "Admin") {
         return next();
       }
-      
-      return res.status(403).json({ 
+
+      return res.status(403).json({
         error: "Admin access required",
         message: "This action requires administrator privileges"
       });
@@ -112,6 +112,7 @@ export function requireAdmin() {
 
 function getCurrentUserId(req: Request): number | null {
   const userIdHeader = req.headers["x-user-id"];
+  console.log("\n ******************************************* ", userIdHeader, "\n*********************")
   if (userIdHeader) {
     const id = parseInt(userIdHeader as string, 10);
     return isNaN(id) ? null : id;
@@ -122,7 +123,7 @@ function getCurrentUserId(req: Request): number | null {
 export async function getUserWithPermissions(userId: number) {
   const user = await storage.getUser(userId);
   if (!user) return null;
-  
+
   return {
     ...user,
     permissions: user.permissions || [],

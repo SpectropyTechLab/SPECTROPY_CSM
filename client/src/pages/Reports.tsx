@@ -41,8 +41,8 @@ export default function Reports() {
   const availableProjects = isAdmin
     ? projects
     : projects.filter((p) => {
-        return true;
-      });
+      return true;
+    });
 
   useEffect(() => {
     if (availableProjects.length > 0 && !selectedProjectId) {
@@ -106,7 +106,7 @@ export default function Reports() {
             </TabsList>
 
             <AnimatePresence mode="wait">
-              <TabsContent value="projects" className="mt-0">
+              <TabsContent key="projects" value="projects" className="mt-0">
                 <motion.div
                   key="projects"
                   initial={{ opacity: 0, x: -20 }}
@@ -123,7 +123,7 @@ export default function Reports() {
                 </motion.div>
               </TabsContent>
 
-              <TabsContent value="users" className="mt-0">
+              <TabsContent key="users" value="users" className="mt-0">
                 <motion.div
                   key="users"
                   initial={{ opacity: 0, x: -20 }}
@@ -141,7 +141,7 @@ export default function Reports() {
                 </motion.div>
               </TabsContent>
 
-              <TabsContent value="deadlines" className="mt-0">
+              <TabsContent key="deadlines" value="deadlines" className="mt-0">
                 <motion.div
                   key="deadlines"
                   initial={{ opacity: 0, x: -20 }}
@@ -156,7 +156,7 @@ export default function Reports() {
                 </motion.div>
               </TabsContent>
 
-              <TabsContent value="buckets" className="mt-0">
+              <TabsContent key="buckets" value="buckets" className="mt-0">
                 <motion.div
                   key="buckets"
                   initial={{ opacity: 0, x: -20 }}

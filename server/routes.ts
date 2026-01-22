@@ -12,11 +12,11 @@ import {
 } from "./emailService";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
-import { 
-  createPermissionMiddleware, 
-  requireAdmin, 
+import {
+  createPermissionMiddleware,
+  requireAdmin,
   hasPermission,
-  getUserWithPermissions 
+  getUserWithPermissions
 } from "./permissions";
 
 const otpMap = new Map<
@@ -30,6 +30,15 @@ function generateOTP(): string {
 }
 
 function getCurrentUserId(req: import("express").Request): number {
+
+  const userIdHeader = req.headers["x-user-id"];
+
+
+  if (userIdHeader) {
+    const id = Number(userIdHeader);
+    return Number.isNaN(id) ? 2 : id;
+  }
+
   return 2;
 }
 
@@ -164,7 +173,7 @@ export async function registerRoutes(
       if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "CREATE_PROJECT"))) {
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to create projects" });
       }
-      
+
       const input = api.projects.create.input.parse(req.body);
       const userId = getCurrentUserId(req);
 
@@ -204,11 +213,11 @@ export async function registerRoutes(
       if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "UPDATE_PROJECT"))) {
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to update projects" });
       }
-      
+
       const input = api.projects.update.input.parse(req.body);
       const userId = getCurrentUserId(req);
       const projectId = Number(req.params.id);
-      
+
       const oldProject = await storage.getProject(projectId);
       const project = await storage.updateProject(projectId, {
         ...input,
@@ -244,7 +253,7 @@ export async function registerRoutes(
       if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "DELETE_PROJECT"))) {
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete projects" });
       }
-      
+
       const projectId = Number(req.params.id);
       const project = await storage.getProject(projectId);
       if (!project) {
@@ -262,7 +271,7 @@ export async function registerRoutes(
           action: "deleted",
           performedBy: currentUser.id,
           performedByName: currentUser.name,
-          payload: JSON.parse(JSON.stringify({ 
+          payload: JSON.parse(JSON.stringify({
             project,
             tasks: projectTasks,
             buckets: projectBuckets,
@@ -321,7 +330,7 @@ export async function registerRoutes(
       if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "CREATE_TASK"))) {
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to create tasks" });
       }
-      
+
       const input = api.tasks.create.input.parse(req.body);
       const task = await storage.createTask(input);
 
@@ -363,20 +372,20 @@ export async function registerRoutes(
       const currentUser = await storage.getUser(getCurrentUserId(req));
       const existingTask = await storage.getTask(Number(req.params.id));
       const input = api.tasks.update.input.parse(req.body);
-      
+
       const isCompletion = input.status === "completed" && existingTask?.status !== "completed";
       const isUncompletion = input.status !== "completed" && existingTask?.status === "completed";
-      
+
       if (!currentUser) {
         return res.status(401).json({ error: "User not found" });
       }
-      
+
       if (isCompletion || isUncompletion) {
         const isAssignedToTask = existingTask && (
           existingTask.assigneeId === currentUser.id ||
           (existingTask.assignedUsers && existingTask.assignedUsers.includes(currentUser.id))
         );
-        
+
         if (currentUser.role !== "Admin" && !hasPermission(currentUser, "COMPLETE_TASK") && !isAssignedToTask) {
           return res.status(403).json({ error: "Permission denied", message: "You do not have permission to mark tasks as complete/incomplete" });
         }
@@ -385,7 +394,7 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Permission denied", message: "You do not have permission to update tasks" });
         }
       }
-      
+
       const task = await storage.updateTask(Number(req.params.id), input);
       const project = await storage.getProject(task.projectId);
 
@@ -484,7 +493,7 @@ export async function registerRoutes(
       if (!currentUser || (currentUser.role !== "Admin" && !hasPermission(currentUser, "DELETE_TASK"))) {
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete tasks" });
       }
-      
+
       await storage.deleteTask(Number(req.params.id));
       res.status(204).send();
     } catch (err) {
@@ -523,7 +532,7 @@ export async function registerRoutes(
       if (!currentUser || currentUser.role !== "Admin") {
         return res.status(403).json({ error: "Permission denied", message: "Only admins can manage user permissions" });
       }
-      
+
       const permissionSchema = z.object({
         permissions: z.array(z.enum(PERMISSIONS)),
       });
@@ -544,7 +553,7 @@ export async function registerRoutes(
       if (!currentUser || currentUser.role !== "Admin") {
         return res.status(403).json({ error: "Permission denied", message: "Only admins can change user roles" });
       }
-      
+
       const roleSchema = z.object({
         role: z.enum(["Admin", "User"]),
       });
@@ -610,7 +619,7 @@ export async function registerRoutes(
 
       const hashedPassword = await hashPassword(newPassword);
       await storage.updateUser(user.id, { password: hashedPassword });
-      
+
       otpMap.delete(email);
       res.json({ message: "Password reset successfully" });
     } catch (err) {
@@ -923,7 +932,7 @@ export async function registerRoutes(
       const input = checklistItemSchema.parse(req.body);
       const checklist = [...(task.checklist || []), input];
       const history = [...(task.history || []), `Checklist item added: "${input.title}" on ${new Date().toLocaleDateString()}`];
-      
+
       const updatedTask = await storage.updateTask(taskId, { checklist, history });
       res.json(updatedTask);
     } catch (err) {
@@ -942,15 +951,15 @@ export async function registerRoutes(
       if (!task) return res.status(404).json({ message: "Task not found" });
 
       const { completed, title } = req.body;
-      const checklist = (task.checklist || []).map(item => 
+      const checklist = (task.checklist || []).map(item =>
         item.id === itemId ? { ...item, ...(completed !== undefined ? { completed } : {}), ...(title !== undefined ? { title } : {}) } : item
       );
-      
-      const historyEntry = completed !== undefined 
+
+      const historyEntry = completed !== undefined
         ? `Checklist item "${title || 'item'}" marked as ${completed ? 'completed' : 'incomplete'} on ${new Date().toLocaleDateString()}`
         : `Checklist item updated on ${new Date().toLocaleDateString()}`;
       const history = [...(task.history || []), historyEntry];
-      
+
       const updatedTask = await storage.updateTask(taskId, { checklist, history });
       res.json(updatedTask);
     } catch (err) {
@@ -968,7 +977,7 @@ export async function registerRoutes(
       const removedItem = (task.checklist || []).find(item => item.id === itemId);
       const checklist = (task.checklist || []).filter(item => item.id !== itemId);
       const history = [...(task.history || []), `Checklist item removed: "${removedItem?.title || 'item'}" on ${new Date().toLocaleDateString()}`];
-      
+
       const updatedTask = await storage.updateTask(taskId, { checklist, history });
       res.json(updatedTask);
     } catch (err) {
@@ -984,15 +993,15 @@ export async function registerRoutes(
       if (!task) return res.status(404).json({ message: "Task not found" });
 
       const input = attachmentSchema.parse(req.body);
-      
+
       // Validate file size (10MB limit)
       if (input.size > 10 * 1024 * 1024) {
         return res.status(400).json({ message: "File size exceeds 10MB limit" });
       }
-      
+
       const attachments = [...(task.attachments || []), input];
       const history = [...(task.history || []), `Attachment added: "${input.name}" on ${new Date().toLocaleDateString()}`];
-      
+
       const updatedTask = await storage.updateTask(taskId, { attachments, history });
       res.json(updatedTask);
     } catch (err) {
@@ -1013,7 +1022,7 @@ export async function registerRoutes(
       const removedAttachment = (task.attachments || []).find(att => att.id === attachmentId);
       const attachments = (task.attachments || []).filter(att => att.id !== attachmentId);
       const history = [...(task.history || []), `Attachment removed: "${removedAttachment?.name || 'file'}" on ${new Date().toLocaleDateString()}`];
-      
+
       const updatedTask = await storage.updateTask(taskId, { attachments, history });
       res.json(updatedTask);
     } catch (err) {
@@ -1036,10 +1045,10 @@ export async function registerRoutes(
       if (task.bucketId) {
         const buckets = await storage.getBuckets(task.projectId);
         const currentBucketIndex = buckets.findIndex(b => b.id === task.bucketId);
-        
+
         if (currentBucketIndex >= 0 && currentBucketIndex < buckets.length - 1) {
           const nextBucket = buckets[currentBucketIndex + 1];
-          
+
           // Create new task in next bucket with empty dates
           const newTask = await storage.createTask({
             title: task.title,
@@ -1057,11 +1066,11 @@ export async function registerRoutes(
             checklist: [],
             attachments: [],
           });
-          
+
           return res.json({ completedTask: task, newTask });
         }
       }
-      
+
       res.json({ completedTask: task, newTask: null });
     } catch (err) {
       res.status(500).json({ message: "Failed to progress task" });
@@ -1075,7 +1084,7 @@ export async function registerRoutes(
       if (!currentUser || currentUser.role !== "Admin") {
         return res.status(403).json({ error: "Permission denied", message: "Only admins can view activity logs" });
       }
-      
+
       const logs = await storage.getActivityLogs();
       res.json(logs);
     } catch (err) {
