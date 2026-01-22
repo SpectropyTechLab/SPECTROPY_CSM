@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { downloadAttachment } from "../hooks/use-download";
+
 import {
   Dialog,
   DialogContent,
@@ -277,7 +279,7 @@ export default function ProjectBoard() {
     const message = taskCount > 0
       ? `Are you sure you want to delete "${bucket.title}" and its ${taskCount} task${taskCount > 1 ? 's' : ''}?`
       : `Are you sure you want to delete "${bucket.title}"?`;
-    
+
     if (confirm(message)) {
       deleteBucketMutation.mutate(bucket.id);
     }
@@ -994,15 +996,13 @@ export default function ProjectBoard() {
                       draggable
                       onDragStart={() => handleDragStart(task)}
                       onDragEnd={handleDragEnd}
-                      className={`cursor-grab active:cursor-grabbing ${
-                        draggedTask?.id === task.id ? "opacity-50" : ""
-                      }`}
+                      className={`cursor-grab active:cursor-grabbing ${draggedTask?.id === task.id ? "opacity-50" : ""
+                        }`}
                       data-testid={`task-card-${task.id}`}
                     >
                       <Card
-                        className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate ${
-                          task.status === "completed" ? "opacity-60" : ""
-                        }`}
+                        className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate ${task.status === "completed" ? "opacity-60" : ""
+                          }`}
                       >
                         <div className="flex items-start gap-2">
                           <Checkbox
@@ -1023,11 +1023,10 @@ export default function ProjectBoard() {
                           >
                             <div className="flex items-start justify-between gap-2">
                               <p
-                                className={`font-medium text-sm truncate ${
-                                  task.status === "completed"
-                                    ? "line-through text-muted-foreground"
-                                    : ""
-                                }`}
+                                className={`font-medium text-sm truncate ${task.status === "completed"
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                                  }`}
                                 data-testid={`text-task-title-${task.id}`}
                               >
                                 {task.title}
@@ -1201,11 +1200,10 @@ export default function ProjectBoard() {
                                       data-testid={`checkbox-checklist-${item.id}`}
                                     />
                                     <span
-                                      className={`text-xs truncate ${
-                                        item.completed
-                                          ? "line-through text-muted-foreground"
-                                          : ""
-                                      }`}
+                                      className={`text-xs truncate ${item.completed
+                                        ? "line-through text-muted-foreground"
+                                        : ""
+                                        }`}
                                     >
                                       {item.title}
                                     </span>
@@ -1665,9 +1663,13 @@ export default function ProjectBoard() {
                       className="flex items-center gap-2 p-2 bg-muted rounded"
                     >
                       {getFileIcon(att.type)}
-                      <span className="flex-1 text-sm truncate">
+                      <button
+                        className="flex-1 text-sm truncate text-left text-indigo-500 hover:underline"
+                        onClick={() => downloadAttachment(att.url, att.name)}
+                      >
                         {att.name}
-                      </span>
+                      </button>
+
                       <span className="text-xs text-muted-foreground">
                         {(att.size / 1024).toFixed(1)}KB
                       </span>

@@ -10,7 +10,8 @@ import {
   createTaskCompletionEmail,
   createTaskUpdateEmail,
 } from "./emailService";
-import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import { SupabaseStorageService } from "./services/supabaseStorage";
+
 import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
 import {
   createPermissionMiddleware,
@@ -18,6 +19,14 @@ import {
   hasPermission,
   getUserWithPermissions
 } from "./permissions";
+
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+const storageService = new SupabaseStorageService();
 
 const otpMap = new Map<
   string,
@@ -52,7 +61,7 @@ async function verifyPassword(
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
-
+//iintial dummy data for database  
 async function seedDatabase() {
   const users = await storage.getUsers();
   if (users.length === 0) {
@@ -919,8 +928,64 @@ export async function registerRoutes(
     res.json(statusBreakdown);
   });
 
-  // Register Object Storage routes
-  registerObjectStorageRoutes(app);
+  app.post("/api/uploads/request-url", async (req, res) => {
+    try {
+      const { name, size, contentType } = req.body;
+
+      if (!name || !contentType) {
+        return res.status(400).json({ error: "Missing file metadata" });
+      }
+
+      const userId = getCurrentUserId(req);
+
+      const result = await storageService.getSignedUploadUrl({
+        userId,
+        fileName: name,
+        contentType,
+      });
+
+      res.json({
+        uploadURL: result.uploadURL,
+        objectPath: result.objectPath,
+        metadata: {
+          name,
+          size,
+          contentType,
+        },
+      });
+    } catch (err) {
+      console.error("Supabase upload error:", err);
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  });
+
+
+  app.get("/api/uploads/download", async (req, res) => {
+    try {
+      const objectPath = req.query.path as string;
+
+      if (!objectPath) {
+        return res.status(400).json({ error: "Missing file path" });
+      }
+
+      // Optional: permission check here
+      // const userId = getCurrentUserId(req);
+
+      const { data, error } = await supabase.storage
+        .from("uploads")
+        .createSignedUrl(objectPath, 60); // 60 seconds
+
+      if (error || !data) {
+        return res.status(500).json({ error: "Failed to generate download URL" });
+      }
+
+      res.json({ downloadURL: data.signedUrl });
+    } catch (err) {
+      console.error("Download URL error:", err);
+      res.status(500).json({ error: "Download failed" });
+    }
+  });
+
 
   // Task checklist endpoints
   app.post("/api/tasks/:id/checklist", async (req, res) => {
