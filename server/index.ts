@@ -4,6 +4,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import cors from "cors";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,7 +14,15 @@ declare module "http" {
     rawBody: unknown;
   }
 }
-
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://YOUR-FRONTEND.onrender.com"
+    ],
+    credentials: true,
+  })
+);
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -59,6 +68,9 @@ app.use((req, res, next) => {
   });
 
   next();
+});
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 (async () => {
