@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 interface EmailOptions {
   to: string;
@@ -18,41 +18,56 @@ interface TaskNotificationData {
   modificationType?: string;
 }
 
-// Note: The secrets are swapped - GMAIL_USER contains app password, GMAIL_APP_PASS contains email
-const gmailUser = process.env.GMAIL_APP_PASS; // Actually the email address
-const gmailPass = process.env.GMAIL_USER;     // Actually the app password
+const resendApiKey = process.env.RESEND_API_KEY;
+const resendFrom = process.env.RESEND_FROM;
 
-console.log(`Email service: GMAIL_USER is ${gmailUser ? 'SET (' + gmailUser + ')' : 'NOT SET'}`);
-console.log(`Email service: GMAIL_APP_PASS is ${gmailPass ? 'SET (' + gmailPass.length + ' chars)' : 'NOT SET'}`);
+console.log(
+  `Email service: RESEND_API_KEY is ${resendApiKey ? "SET" : "NOT SET"
+  }`
+);
+console.log(
+  `Email service: RESEND_FROM is ${resendFrom ? `SET (${resendFrom})` : "NOT SET"
+  }`
+);
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: gmailUser,
-    pass: gmailPass,
-  },
-});
+const resend = new Resend(resendApiKey);
 
-export async function sendEmail({ to, subject, html }: EmailOptions): Promise<boolean> {
-  if (!gmailUser || !gmailPass) {
-    console.log("Email credentials not configured. Skipping email notification.");
+export async function sendEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
+  if (!resendApiKey || !resendFrom) {
+    console.error("Resend env not configured");
     return false;
   }
 
   try {
-    const info = await transporter.sendMail({
-      from: `"Spectropy PMS" <${gmailUser}>`,
+    const response = await resend.emails.send({
+      from: `Spectropy PMS <${resendFrom}>`,
       to,
       subject,
       html,
     });
-    console.log(`Email sent to ${to}: ${info.messageId}`);
+
+    if (response.error) {
+      console.error("Resend API error:", response.error);
+      return false;
+    }
+
+    console.log("Email sent successfully:", response.data?.id);
     return true;
-  } catch (error) {
-    console.error(`Failed to send email to ${to}:`, error);
+  } catch (err) {
+    console.error("Unexpected email error:", err);
     return false;
   }
 }
+
+/* -------------------- Helpers & Templates -------------------- */
 
 function formatDate(date: Date | null | undefined): string {
   if (!date) return "Not set";
@@ -104,7 +119,11 @@ function getEmailTemplate(title: string, content: string): string {
   `;
 }
 
-export function createTaskAssignmentEmail(data: TaskNotificationData): { subject: string; html: string } {
+/* -------------------- Email Builders -------------------- */
+
+export function createTaskAssignmentEmail(
+  data: TaskNotificationData
+): { subject: string; html: string } {
   const content = `
     <p>You have been assigned a new task.</p>
     <div class="task-details">
@@ -113,12 +132,14 @@ export function createTaskAssignmentEmail(data: TaskNotificationData): { subject
         <span class="detail-label">Project:</span>
         <span class="detail-value">${data.projectName}</span>
       </div>
-      ${data.taskDescription ? `
+      ${data.taskDescription
+      ? `
       <div class="detail-row">
         <span class="detail-label">Description:</span>
         <span class="detail-value">${data.taskDescription}</span>
-      </div>
-      ` : ""}
+      </div>`
+      : ""
+    }
       <div class="detail-row">
         <span class="detail-label">Assigned By:</span>
         <span class="detail-value">${data.assignedBy || "System"}</span>
@@ -137,7 +158,9 @@ export function createTaskAssignmentEmail(data: TaskNotificationData): { subject
   };
 }
 
-export function createTaskCompletionEmail(data: TaskNotificationData): { subject: string; html: string } {
+export function createTaskCompletionEmail(
+  data: TaskNotificationData
+): { subject: string; html: string } {
   const content = `
     <p>A task has been marked as completed.</p>
     <div class="task-details">
@@ -164,7 +187,9 @@ export function createTaskCompletionEmail(data: TaskNotificationData): { subject
   };
 }
 
-export function createTaskUpdateEmail(data: TaskNotificationData): { subject: string; html: string } {
+export function createTaskUpdateEmail(
+  data: TaskNotificationData
+): { subject: string; html: string } {
   const content = `
     <p>A task you are associated with has been updated.</p>
     <div class="task-details">
@@ -179,7 +204,8 @@ export function createTaskUpdateEmail(data: TaskNotificationData): { subject: st
       </div>
       <div class="detail-row">
         <span class="detail-label">Modification:</span>
-        <span class="detail-value">${data.modificationType || "Task details updated"}</span>
+        <span class="detail-value">${data.modificationType || "Task details updated"
+    }</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">Current Status:</span>
