@@ -48,6 +48,7 @@ export default function Logs() {
       case "project":
         return <FolderKanban className="h-4 w-4 text-primary" />;
       case "task":
+      case "Customer":
         return <CheckSquare className="h-4 w-4 text-accent" />;
       case "user":
         return <User className="h-4 w-4 text-slate-500" />;
@@ -86,7 +87,7 @@ export default function Logs() {
           Activity Logs
         </h2>
         <p className="text-slate-500">
-          Track all project and task creation/deletion activities
+          Track all project and Customer creation/deletion activities
         </p>
       </div>
 
@@ -180,3 +181,6 @@ export default function Logs() {
     </div>
   );
 }
+
+
+

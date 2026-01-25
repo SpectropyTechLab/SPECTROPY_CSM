@@ -157,7 +157,7 @@ export default function UserProjects() {
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <CheckCircle2 className="h-4 w-4" />
-                            <span>{stats.completed}/{stats.total} tasks</span>
+                            <span>{stats.completed}/{stats.total} customers</span>
                           </div>
                           {project.startDate && (
                             <div className="flex items-center gap-1 text-muted-foreground">
@@ -178,3 +178,4 @@ export default function UserProjects() {
     </div>
   );
 }
+

@@ -45,14 +45,14 @@ const Dashboard = () => {
       bg: "bg-blue-400/10",
     },
     {
-      label: "Total Tasks",
+      label: "Total Customers",
       value: tasks.length.toString(),
       icon: CheckSquare,
       color: "text-primary",
       bg: "bg-primary/10",
     },
     {
-      label: "Completed Tasks",
+      label: "Completed Customers",
       value: completedTasks.length.toString(),
       icon: Target,
       color: "text-accent",
@@ -157,9 +157,9 @@ const Dashboard = () => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-slate-700 font-medium">
-                  Task Completion
+                  Customer Completion
                 </span>
-                <span className="text-accent font-bold">{completedTasks.length}/{tasks.length} Tasks</span>
+                <span className="text-accent font-bold">{completedTasks.length}/{tasks.length} Customers</span>
               </div>
               <Progress value={efficiency} className="h-3 bg-slate-100" />
             </div>
@@ -195,7 +195,7 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-900">
               <PieChartIcon className="w-5 h-5 text-accent" />
-              Task Status Breakdown
+              Customer Status Breakdown
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -206,7 +206,7 @@ const Dashboard = () => {
                   <p className="text-sm font-medium text-slate-700">
                     To Do
                   </p>
-                  <p className="text-xs text-slate-500">{todoTasks.length} tasks ({tasks.length > 0 ? Math.round((todoTasks.length / tasks.length) * 100) : 0}%)</p>
+                  <p className="text-xs text-slate-500">{todoTasks.length} customers ({tasks.length > 0 ? Math.round((todoTasks.length / tasks.length) * 100) : 0}%)</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -215,7 +215,7 @@ const Dashboard = () => {
                   <p className="text-sm font-medium text-slate-700">
                     In Progress
                   </p>
-                  <p className="text-xs text-slate-500">{inProgressTasks.length} tasks ({tasks.length > 0 ? Math.round((inProgressTasks.length / tasks.length) * 100) : 0}%)</p>
+                  <p className="text-xs text-slate-500">{inProgressTasks.length} customers ({tasks.length > 0 ? Math.round((inProgressTasks.length / tasks.length) * 100) : 0}%)</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -224,7 +224,7 @@ const Dashboard = () => {
                   <p className="text-sm font-medium text-slate-700">
                     Completed
                   </p>
-                  <p className="text-xs text-slate-500">{completedTasks.length} tasks ({efficiency}%)</p>
+                  <p className="text-xs text-slate-500">{completedTasks.length} customers ({efficiency}%)</p>
                 </div>
               </div>
             </div>
@@ -236,3 +236,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+

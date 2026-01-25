@@ -70,14 +70,14 @@ export default function AdminTasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       toast({
-        title: "Task updated",
-        description: "Task status has been updated successfully.",
+        title: "Customer updated",
+        description: "Customer status has been updated successfully.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update task status.",
+        description: "Failed to update customer status.",
         variant: "destructive",
       });
     },
@@ -188,10 +188,10 @@ export default function AdminTasks() {
       >
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-admin-tasks-title">
-            All Tasks
+            All Customers
           </h1>
           <p className="text-muted-foreground mt-1">
-            Manage and monitor all tasks across projects
+            Manage and monitor all Customers across projects
           </p>
         </div>
       </motion.div>
@@ -242,7 +242,7 @@ export default function AdminTasks() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckSquare className="h-5 w-5" />
-            Task List
+            Customer List
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -305,16 +305,16 @@ export default function AdminTasks() {
           {filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <CheckSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No tasks found matching the filters</p>
+              <p>No Customers found matching the filters</p>
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Task</TableHead>
+                    <TableHead>Customer</TableHead>
                     <TableHead>Project</TableHead>
-                    <TableHead>Bucket</TableHead>
+                    <TableHead>Stage</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Assignees</TableHead>
@@ -446,3 +446,5 @@ export default function AdminTasks() {
     </div>
   );
 }
+
+

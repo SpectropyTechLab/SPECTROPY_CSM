@@ -58,14 +58,14 @@ export default function UserTasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", { assigneeId: userId }] });
       toast({
-        title: "Task updated",
-        description: "Task status has been updated successfully.",
+        title: "Customer updated",
+        description: "Customer status has been updated successfully.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update task status.",
+        description: "Failed to update customer status.",
         variant: "destructive",
       });
     },
@@ -93,7 +93,7 @@ export default function UserTasks() {
     if (task.status === "completed") {
       toast({
         title: "Cannot modify",
-        description: "Completed tasks cannot be modified.",
+        description: "Completed customers cannot be modified.",
         variant: "destructive",
       });
       return;
@@ -154,10 +154,10 @@ export default function UserTasks() {
       >
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-900" data-testid="text-page-title">
-            My Tasks
+            My Customers
           </h1>
           <p className="text-muted-foreground mt-1 text-sm md:text-base">
-            View and manage all your assigned tasks
+            View and manage all your assigned Customers
           </p>
         </div>
 
@@ -198,11 +198,11 @@ export default function UserTasks() {
             {filteredTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckSquare className="h-12 w-12 text-slate-300 mb-4" />
-                <h3 className="text-lg font-medium text-slate-600">No tasks found</h3>
+                <h3 className="text-lg font-medium text-slate-600">No Customers found</h3>
                 <p className="text-muted-foreground mt-1">
                   {statusFilter !== "all" || priorityFilter !== "all"
-                    ? "Try changing the filters to see more tasks"
-                    : "You haven't been assigned any tasks yet"}
+                    ? "Try changing the filters to see more customers"
+                    : "You haven't been assigned any customers yet"}
                 </p>
               </div>
             ) : (
@@ -280,7 +280,7 @@ export default function UserTasks() {
                       <TableRow>
                         <TableHead className="min-w-[200px]">Title</TableHead>
                         <TableHead>Project</TableHead>
-                        <TableHead>Bucket</TableHead>
+                        <TableHead>Stage</TableHead>
                         <TableHead>Priority</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Estimate</TableHead>
@@ -419,3 +419,5 @@ export default function UserTasks() {
     </div>
   );
 }
+
+

@@ -209,7 +209,7 @@ export default function ProjectReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Tasks
+                  Total Customers
                 </CardTitle>
                 <ListTodo className="h-4 w-4 text-primary" />
               </CardHeader>
@@ -224,7 +224,7 @@ export default function ProjectReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Overdue Tasks
+                  Overdue Customers
                 </CardTitle>
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
@@ -264,13 +264,13 @@ export default function ProjectReports({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FolderKanban className="h-5 w-5" />
-                    Bucket Distribution
+                    Stage Distribution
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {bucketDistribution.length === 0 ? (
                     <div className="h-[280px] flex items-center justify-center text-muted-foreground">
-                      No tasks in buckets
+                      No Customers in Stages
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={280}>
@@ -295,7 +295,7 @@ export default function ProjectReports({
                         </Pie>
                         <Tooltip
                           formatter={(value: number, name: string) => [
-                            `${value} tasks`,
+                            `${value} customers`,
                             name,
                           ]}
                           contentStyle={{
@@ -325,7 +325,7 @@ export default function ProjectReports({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ListTodo className="h-5 w-5" />
-                    Task Status
+                    Customer Status
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -362,3 +362,5 @@ export default function ProjectReports({
     </div>
   );
 }
+
+

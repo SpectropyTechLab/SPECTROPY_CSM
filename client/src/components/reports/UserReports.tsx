@@ -165,7 +165,7 @@ export default function UserReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tasks Assigned
+                  Customers Assigned
                 </CardTitle>
                 <ListTodo className="h-4 w-4 text-primary" />
               </CardHeader>
@@ -231,7 +231,7 @@ export default function UserReports({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CheckCircle2 className="h-5 w-5" />
-                    Task Status
+                    Customer Status
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -253,7 +253,7 @@ export default function UserReports({
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number, name: string) => [`${value} tasks`, name]}
+                        formatter={(value: number, name: string) => [`${value} customers`, name]}
                         contentStyle={{
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
@@ -311,3 +311,5 @@ export default function UserReports({
     </div>
   );
 }
+
+

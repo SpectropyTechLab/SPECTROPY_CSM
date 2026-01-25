@@ -334,7 +334,7 @@ const Projects = () => {
 
                   <CardContent className="pb-6">
                     <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-slate-500">Tasks</span>
+                      <span className="text-slate-500">Customers</span>
                       <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
                         {getProjectTaskCount(project.id)} total
                       </span>
@@ -428,3 +428,4 @@ const Projects = () => {
 };
 
 export default Projects;
+

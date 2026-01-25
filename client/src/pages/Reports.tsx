@@ -43,8 +43,8 @@ export default function Reports() {
   const availableProjects = isAdmin
     ? projects
     : projects.filter((p) => {
-      return true;
-    });
+        return true;
+      });
 
   useEffect(() => {
     if (availableProjects.length > 0 && !selectedProjectId) {
@@ -76,7 +76,7 @@ export default function Reports() {
             Reports & Analytics
           </h1>
           <p className="text-muted-foreground mt-1">
-            Comprehensive analytics dashboard for your projects and tasks
+            Comprehensive analytics dashboard for your projects and customers
           </p>
         </div>
         <Button onClick={handleRefresh} variant="outline" data-testid="button-refresh-reports">
@@ -103,11 +103,11 @@ export default function Reports() {
               </TabsTrigger>
               <TabsTrigger value="buckets" className="gap-2" data-testid="tab-buckets">
                 <Layers className="h-4 w-4" />
-                <span className="hidden sm:inline">Buckets</span>
+                <span className="hidden sm:inline">Stages</span>
               </TabsTrigger>
               <TabsTrigger value="tasks" className="gap-2" data-testid="tab-tasks">
                 <ListTodo className="h-4 w-4" />
-                <span className="hidden sm:inline">Tasks</span>
+                <span className="hidden sm:inline">Customers</span>
               </TabsTrigger>
             </TabsList>
 
@@ -155,10 +155,7 @@ export default function Reports() {
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <DeadlineReports
-                    isAdmin={isAdmin}
-                    currentUserId={currentUserId}
-                  />
+                  <DeadlineReports isAdmin={isAdmin} currentUserId={currentUserId} />
                 </motion.div>
               </TabsContent>
 
@@ -190,7 +187,13 @@ export default function Reports() {
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <TaskReport />
+                  <TaskReport
+                    selectedProjectId={selectedProjectId}
+                    onProjectChange={setSelectedProjectId}
+                    projects={availableProjects}
+                    isAdmin={isAdmin}
+                    currentUserId={currentUserId}
+                  />
                 </motion.div>
               </TabsContent>
             </AnimatePresence>
@@ -200,3 +203,5 @@ export default function Reports() {
     </div>
   );
 }
+
+

@@ -12,7 +12,7 @@ export function useTasks(projectId?: number) {
         url += `?projectId=${projectId}`;
       }
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
+      if (!res.ok) throw new Error("Failed to fetch customers");
       return api.tasks.list.responses[200].parse(await res.json());
     },
   });
@@ -29,12 +29,12 @@ export function useCreateTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create task");
+      if (!res.ok) throw new Error("Failed to create customer");
       return api.tasks.create.responses[201].parse(await res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
-      toast({ title: "Task Created", description: "New task added to board" });
+      toast({ title: "Customer Created", description: "New customer added to board" });
     },
   });
 }
@@ -51,7 +51,7 @@ export function useUpdateTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error("Failed to update task");
+      if (!res.ok) throw new Error("Failed to update customer");
       return api.tasks.update.responses[200].parse(await res.json());
     },
     onSuccess: () => {
@@ -70,11 +70,12 @@ export function useDeleteTask() {
     mutationFn: async (id: number) => {
       const url = buildUrl(api.tasks.delete.path, { id });
       const res = await fetch(url, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete task");
+      if (!res.ok) throw new Error("Failed to delete customer");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
-      toast({ title: "Deleted", description: "Task removed" });
+      toast({ title: "Deleted", description: "Customer removed" });
     },
   });
 }
+

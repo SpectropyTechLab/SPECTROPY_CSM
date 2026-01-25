@@ -106,7 +106,7 @@ export default function UserDashboard() {
             Welcome back, {userName}!
           </h1>
           <p className="text-muted-foreground mt-1">
-            Here's an overview of your tasks and projects
+            Here's an overview of your Customers and projects
           </p>
         </div>
       </motion.div>
@@ -143,7 +143,7 @@ export default function UserDashboard() {
           <Card className="hover-elevate">
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Tasks
+                Total Customers
               </CardTitle>
               <CheckSquare className="h-4 w-4 text-accent" />
             </CardHeader>
@@ -226,7 +226,7 @@ export default function UserDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">
-                Task Status Distribution
+                Customer Status Distribution
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -255,7 +255,7 @@ export default function UserDashboard() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-[250px] text-muted-foreground">
-                  No tasks assigned yet
+                  No Customers assigned yet
                 </div>
               )}
             </CardContent>
@@ -354,7 +354,7 @@ export default function UserDashboard() {
                         />
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {completed}/{projectTasks.length} tasks completed
+                        {completed}/{projectTasks.length} customers completed
                       </p>
                     </div>
                   </Link>
@@ -376,7 +376,7 @@ export default function UserDashboard() {
         >
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle className="text-lg">Recent Tasks</CardTitle>
+              <CardTitle className="text-lg">Recent Customers</CardTitle>
               <Link href="/user/tasks">
                 <Button variant="ghost" size="sm">
                   View All <ArrowRight className="h-4 w-4 ml-1" />
@@ -416,7 +416,7 @@ export default function UserDashboard() {
               ))}
               {myTasks.length === 0 && (
                 <p className="text-muted-foreground text-center py-4">
-                  No tasks assigned yet
+                  No Customers assigned yet
                 </p>
               )}
             </CardContent>
@@ -426,3 +426,5 @@ export default function UserDashboard() {
     </div>
   );
 }
+
+

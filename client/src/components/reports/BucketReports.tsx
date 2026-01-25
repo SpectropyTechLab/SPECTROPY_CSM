@@ -169,14 +169,14 @@ export default function BucketReports({
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  Select Bucket
+                  Select Stage
                 </label>
                 <Select value={selectedBucketId} onValueChange={onBucketChange}>
                   <SelectTrigger
                     className="w-[200px]"
                     data-testid="select-bucket-report"
                   >
-                    <SelectValue placeholder="Choose a bucket..." />
+                    <SelectValue placeholder="Choose a stage..." />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredBuckets.map((bucket) => (
@@ -191,7 +191,7 @@ export default function BucketReports({
           </CardContent>
         </Card>
         <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Please select a bucket to view reports
+          Please select a Stage to view reports
         </div>
       </div>
     );
@@ -228,14 +228,14 @@ export default function BucketReports({
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">
-                Select Bucket
+                Select Stage
               </label>
               <Select value={selectedBucketId} onValueChange={onBucketChange}>
                 <SelectTrigger
                   className="w-[200px]"
                   data-testid="select-bucket-report"
                 >
-                  <SelectValue placeholder="Choose a bucket..." />
+                  <SelectValue placeholder="Choose a stage..." />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredBuckets.map((bucket) => (
@@ -267,14 +267,14 @@ export default function BucketReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tasks in Bucket
+                  Customers in Stage
                 </CardTitle>
                 <ListTodo className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalInBucket}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Currently in {selectedBucket?.name || "bucket"}
+                  Currently in {selectedBucket?.name || "stage"}
                 </p>
               </CardContent>
             </Card>
@@ -316,7 +316,7 @@ export default function BucketReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Avg Time/Task
+                  Avg Time/Customer
                 </CardTitle>
                 <Clock className="h-4 w-4 text-accent" />
               </CardHeader>
@@ -341,7 +341,7 @@ export default function BucketReports({
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FolderKanban className="h-5 w-5" />
-                    Task Status in Bucket
+                    Customer Status in Stage
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -367,7 +367,7 @@ export default function BucketReports({
                       </Pie>
                       <Tooltip
                         formatter={(value: number, name: string) => [
-                          `${value} tasks`,
+                          `${value} customers`,
                           name,
                         ]}
                         contentStyle={{
@@ -430,3 +430,5 @@ export default function BucketReports({
     </div>
   );
 }
+
+

@@ -158,6 +158,7 @@ export default function ProjectBoard() {
   const [editTaskCustomFields, setEditTaskCustomFields] = useState<Record<string, any>>({});
   const [newChecklistItem, setNewChecklistItem] = useState("");
 
+  const [expandedBuckets, setExpandedBuckets] = useState<Record<number, boolean>>({});
   const { uploadFile: uploadNewFile, isUploading: isUploadingNew } = useUpload({
     onSuccess: (response) => {
       const newAttachment: Attachment = {
@@ -171,6 +172,13 @@ export default function ProjectBoard() {
       setNewTaskAttachments((prev) => [...prev, newAttachment]);
     },
   });
+
+  const toggleBucketCompleted = (bucketId: number) => {
+    setExpandedBuckets(prev => ({
+      ...prev,
+      [bucketId]: !prev[bucketId]
+    }));
+  };
 
   const { uploadFile: uploadEditFile, isUploading: isUploadingEdit } = useUpload({
     onSuccess: (response) => {
@@ -272,8 +280,8 @@ export default function ProjectBoard() {
       queryClient.invalidateQueries({ queryKey: ["/api/buckets", projectId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
       toast({
-        title: "Bucket deleted",
-        description: "The bucket and all its tasks have been removed",
+        title: "Stage deleted",
+        description: "The stage and all its customers have been removed",
       });
     },
   });
@@ -306,14 +314,14 @@ export default function ProjectBoard() {
     if (!canDeleteTask) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to delete buckets",
+        description: "You do not have permission to delete stages",
         variant: "destructive",
       });
       return;
     }
     const taskCount = bucket.tasks.length;
     const message = taskCount > 0
-      ? `Are you sure you want to delete "${bucket.title}" and its ${taskCount} task${taskCount > 1 ? 's' : ''}?`
+      ? `Are you sure you want to delete "${bucket.title}" and its ${taskCount} customer${taskCount > 1 ? 's' : ''}?`
       : `Are you sure you want to delete "${bucket.title}"?`;
 
     if (confirm(message)) {
@@ -457,7 +465,7 @@ export default function ProjectBoard() {
           toast({
             title: "Custom fields update failed",
             description:
-              "Could not sync custom fields to the next bucket. Task will still be created.",
+              "Could not sync custom fields to the next stage. Customer will still be created.",
             variant: "destructive",
           });
         }
@@ -475,7 +483,7 @@ export default function ProjectBoard() {
     if (!canUpdateTask && !canCompleteTask) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to edit tasks",
+        description: "You do not have permission to edit customers",
         variant: "destructive",
       });
       return;
@@ -539,12 +547,12 @@ export default function ProjectBoard() {
     if (!canDeleteTask) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to delete tasks",
+        description: "You do not have permission to delete customers",
         variant: "destructive",
       });
       return;
     }
-    if (confirm("Are you sure you want to delete this task?")) {
+    if (confirm("Are you sure you want to delete this customer?")) {
       deleteTaskMutation.mutate(task.id);
     }
   };
@@ -560,7 +568,7 @@ export default function ProjectBoard() {
     if (!canCreateTask) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to create tasks",
+        description: "You do not have permission to create customers",
         variant: "destructive",
       });
       return;
@@ -594,7 +602,7 @@ export default function ProjectBoard() {
       });
 
       toast({
-        title: "Task cloned",
+        title: "Customer cloned",
         description: `"${task.title}" has been duplicated - edit panel opened`,
       });
 
@@ -602,7 +610,7 @@ export default function ProjectBoard() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to clone task",
+        description: "Failed to clone customer",
         variant: "destructive",
       });
     }
@@ -638,7 +646,7 @@ export default function ProjectBoard() {
     if (isCompletion && !canComplete) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to mark tasks as complete",
+        description: "You do not have permission to mark customers as complete",
         variant: "destructive",
       });
       return;
@@ -647,7 +655,7 @@ export default function ProjectBoard() {
     if (!canUpdateTask && !canComplete) {
       toast({
         title: "Permission denied",
-        description: "You do not have permission to update task status",
+        description: "You do not have permission to update customer status",
         variant: "destructive",
       });
       return;
@@ -694,7 +702,7 @@ export default function ProjectBoard() {
           customFields,
           history: [
             createHistoryEntry(
-              `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
+              `Auto-created from completed customer in ${buckets[currentBucketIndex]?.title || "previous stage"}`,
             ),
           ],
         };
@@ -742,7 +750,7 @@ export default function ProjectBoard() {
       toast({
         title: "Permission denied",
         description:
-          "You do not have permission to mark tasks as complete/incomplete",
+          "You do not have permission to mark customers as complete/incomplete",
         variant: "destructive",
       });
       return;
@@ -784,7 +792,7 @@ export default function ProjectBoard() {
           customFields,
           history: [
             createHistoryEntry(
-              `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
+              `Auto-created from completed customer in ${buckets[currentBucketIndex]?.title || "previous stage"}`,
             ),
           ],
         };
@@ -990,16 +998,16 @@ export default function ProjectBoard() {
               data-testid="button-add-bucket"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Bucket
+              Add Stage
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Bucket</DialogTitle>
+              <DialogTitle>Add New Stage</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <Input
-                placeholder="Bucket title..."
+                placeholder="Stage title..."
                 value={newBucketTitle}
                 onChange={(e) => setNewBucketTitle(e.target.value)}
                 data-testid="input-bucket-title"
@@ -1014,7 +1022,7 @@ export default function ProjectBoard() {
                 disabled={createBucketMutation.isPending}
                 data-testid="button-submit-bucket"
               >
-                Add Bucket
+                Add Stage
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1026,428 +1034,496 @@ export default function ProjectBoard() {
           className="flex gap-3 md:gap-4 h-full pb-4"
           style={{ minWidth: "max-content" }}
         >
-          {bucketsWithTasks.map((bucket) => (
-            <motion.div
-              key={bucket.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col w-72 md:w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex-shrink-0"
-              data-testid={`bucket-column-${bucket.id}`}
-            >
-              <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center gap-2">
-                  {editingBucketId === bucket.id ? (
-                    <Input
-                      value={editingBucketTitle}
-                      onChange={(e) => setEditingBucketTitle(e.target.value)}
-                      onBlur={() => handleSaveBucketTitle(bucket.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveBucketTitle(bucket.id);
-                        else if (e.key === "Escape") {
-                          setEditingBucketId(null);
-                          setEditingBucketTitle("");
-                        }
-                      }}
-                      autoFocus
-                      className="h-7 w-40 text-sm font-medium"
-                      data-testid={`input-edit-bucket-title-${bucket.id}`}
-                    />
-                  ) : (
-                    <h3
-                      className="font-medium cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => {
-                        setEditingBucketId(bucket.id);
-                        setEditingBucketTitle(bucket.title);
-                      }}
-                      data-testid={`text-bucket-title-${bucket.id}`}
-                    >
-                      {bucket.title}
-                    </h3>
-                  )}
-                  <Badge variant="secondary" className="text-xs">
-                    {bucket.tasks.length}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
-                      if (!canCreateTask) {
-                        toast({
-                          title: "Permission denied",
-                          description:
-                            "You do not have permission to create tasks",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      setSelectedBucketId(bucket.id);
-                      setIsNewTaskOpen(true);
-                    }}
-                    disabled={!canCreateTask}
-                    data-testid={`button-add-task-${bucket.id}`}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        data-testid={`button-bucket-menu-${bucket.id}`}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
+          {bucketsWithTasks.map((bucket) => {
+            const activeTasks = bucket.tasks
+              .filter((t) => t.status !== "completed")
+              .sort((a, b) => b.id - a.id); // Sort by newest ID first
+
+            const completedTasks = bucket.tasks
+              .filter((t) => t.status === "completed")
+              .sort((a, b) => b.id - a.id);
+
+            const isExpanded = expandedBuckets[bucket.id] ?? false;
+            return (
+              <motion.div
+                key={bucket.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col w-72 md:w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex-shrink-0"
+                data-testid={`bucket-column-${bucket.id}`}
+              >
+                <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    {editingBucketId === bucket.id ? (
+                      <Input
+                        value={editingBucketTitle}
+                        onChange={(e) => setEditingBucketTitle(e.target.value)}
+                        onBlur={() => handleSaveBucketTitle(bucket.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveBucketTitle(bucket.id);
+                          else if (e.key === "Escape") {
+                            setEditingBucketId(null);
+                            setEditingBucketTitle("");
+                          }
+                        }}
+                        autoFocus
+                        className="h-7 w-40 text-sm font-medium"
+                        data-testid={`input-edit-bucket-title-${bucket.id}`}
+                      />
+                    ) : (
+                      <h3
+                        className="font-medium cursor-pointer hover:text-primary transition-colors"
                         onClick={() => {
                           setEditingBucketId(bucket.id);
                           setEditingBucketTitle(bucket.title);
                         }}
+                        data-testid={`text-bucket-title-${bucket.id}`}
                       >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Rename Bucket
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {/* ADD THIS - Custom Fields Settings */}
-                      <DropdownMenuItem
-                        onSelect={(e) => e.preventDefault()}
-                        className="p-0"
-                      >
-                        <BucketSettingsDialog
-                          bucketId={bucket.id}
-                          currentConfig={bucket.customFieldsConfig || []}
-                        />
-                      </DropdownMenuItem>
-
-                      {/* END ADD */}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDeleteBucket(bucket)}
-                        data-testid={`button-delete-bucket-${bucket.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete Bucket
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              <div
-                className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.add(
-                    "bg-slate-100",
-                    "dark:bg-slate-700/50",
-                  );
-                }}
-                onDragLeave={(e) => {
-                  e.currentTarget.classList.remove(
-                    "bg-slate-100",
-                    "dark:bg-slate-700/50",
-                  );
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove(
-                    "bg-slate-100",
-                    "dark:bg-slate-700/50",
-                  );
-                  handleDrop(bucket.id, bucket.tasks.length);
-                }}
-              >
-                {bucket.tasks.map((task) => {
-                  const assignees = getAssignees(task);
-                  const checklistProgress = getChecklistProgress(
-                    task.checklist,
-                  );
-                  const attachmentCount = task.attachments?.length || 0;
-
-                  return (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      draggable
-                      onDragStart={() => handleDragStart(task)}
-                      onDragEnd={handleDragEnd}
-                      className={`cursor-grab active:cursor-grabbing ${draggedTask?.id === task.id ? "opacity-50" : ""
-                        }`}
-                      data-testid={`task-card-${task.id}`}
+                        {bucket.title}
+                      </h3>
+                    )}
+                    <Badge variant="secondary" className="text-xs">
+                      {bucket.tasks.length}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        if (!canCreateTask) {
+                          toast({
+                            title: "Permission denied",
+                            description:
+                              "You do not have permission to create customers",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        setSelectedBucketId(bucket.id);
+                        setIsNewTaskOpen(true);
+                      }}
+                      disabled={!canCreateTask}
+                      data-testid={`button-add-task-${bucket.id}`}
                     >
-                      <Card
-                        className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate ${task.status === "completed" ? "opacity-60" : ""
-                          }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <Checkbox
-                            checked={task.status === "completed"}
-                            onCheckedChange={(checked) => {
-                              handleStatusChange(
-                                task,
-                                checked ? "completed" : "todo",
-                              );
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-1 flex-shrink-0"
-                            data-testid={`checkbox-task-${task.id}`}
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          data-testid={`button-bucket-menu-${bucket.id}`}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingBucketId(bucket.id);
+                            setEditingBucketTitle(bucket.title);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Rename Stage
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        {/* ADD THIS - Custom Fields Settings */}
+                        <DropdownMenuItem
+                          onSelect={(e) => e.preventDefault()}
+                          className="p-0"
+                        >
+                          <BucketSettingsDialog
+                            bucketId={bucket.id}
+                            currentConfig={bucket.customFieldsConfig || []}
                           />
-                          <div
-                            className="flex-1 min-w-0"
-                            onClick={() => handleOpenEditTask(task)}
+                        </DropdownMenuItem>
+
+                        {/* END ADD */}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDeleteBucket(bucket)}
+                          data-testid={`button-delete-bucket-${bucket.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete Stage
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div
+                  className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add(
+                      "bg-slate-100",
+                      "dark:bg-slate-700/50",
+                    );
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove(
+                      "bg-slate-100",
+                      "dark:bg-slate-700/50",
+                    );
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.remove(
+                      "bg-slate-100",
+                      "dark:bg-slate-700/50",
+                    );
+                    handleDrop(bucket.id, bucket.tasks.length);
+                  }}
+                >
+
+                  {/* Task List Area */}
+                  <div
+                    className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
+                      handleDrop(bucket.id, bucket.tasks.length);
+                    }}
+                  >
+                    {(() => {
+                      // 1. Logic to Sort and Split Tasks
+                      const activeTasks = bucket.tasks
+                        .filter((t) => t.status !== "completed")
+                        .sort((a, b) => b.id - a.id); // Sorted by creation (ID proxy)
+
+                      const completedTasks = bucket.tasks
+                        .filter((t) => t.status === "completed")
+                        .sort((a, b) => b.id - a.id);
+
+                      const isExpanded = expandedBuckets[bucket.id] ?? false;
+
+                      // Helper to render the actual Card UI to avoid duplication
+                      const renderTaskCard = (task: Task) => {
+                        const assignees = getAssignees(task);
+                        const checklistProgress = getChecklistProgress(task.checklist);
+                        const attachmentCount = task.attachments?.length || 0;
+
+                        return (
+                          <motion.div
+                            key={task.id}
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            draggable
+                            onDragStart={() => handleDragStart(task)}
+                            onDragEnd={handleDragEnd}
+                            className={`  active:cursor-grabbing ${draggedTask?.id === task.id ? "opacity-50" : ""}`}
+                            data-testid={`task-card-${task.id}`}
                           >
-                            <div className="flex items-start justify-between gap-2">
-                              <p
-                                className={`font-medium text-sm truncate ${task.status === "completed"
-                                  ? "line-through text-muted-foreground"
-                                  : ""
-                                  }`}
-                                data-testid={`text-task-title-${task.id}`}
-                              >
-                                {task.title}
-                              </p>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  asChild
+                            <Card
+                              className={`p-3 bg-white dark:bg-slate-800 shadow-sm hover-elevate ${task.status === "completed" ? "opacity-60" : ""
+                                }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                <Checkbox
+                                  checked={task.status === "completed"}
+                                  onCheckedChange={(checked) => {
+                                    handleStatusChange(
+                                      task,
+                                      checked ? "completed" : "todo",
+                                    );
+                                  }}
                                   onClick={(e) => e.stopPropagation()}
+                                  className="mt-1 flex-shrink-0"
+                                  data-testid={`checkbox-task-${task.id}`}
+                                />
+                                <div
+                                  className="flex-1 min-w-0"
+                                  onClick={() => handleOpenEditTask(task)}
                                 >
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 flex-shrink-0"
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenEditTask(task);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Task
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={(e) => handleViewHistory(task, e)}
-                                  >
-                                    <History className="h-4 w-4 mr-2" />
-                                    View History
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={(e) => handleCloneTask(task, e)}
-                                    data-testid={`button-clone-task-${task.id}`}
-                                  >
-                                    <Copy className="h-4 w-4 mr-2" />
-                                    Clone Task
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={(e) => handleDeleteTask(task, e)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Task
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-
-                            {task.description && (
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                {task.description}
-                              </p>
-                            )}
-
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger
-                                  asChild
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Button
-                                    variant="secondary"
-                                    className={`text-xs h-6 px-2 rounded-md border-0 ${getStatusColor(task.status)} no-default-hover-elevate no-default-active-elevate hover:brightness-95 transition-all`}
-                                    data-testid={`badge-status-${task.id}`}
-                                  >
-                                    {task.status === "completed" && (
-                                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    )}
-                                    {task.status === "in_progress" && (
-                                      <Clock className="h-3 w-3 mr-1" />
-                                    )}
-                                    {getStatusLabel(task.status)}
-                                    <ChevronDown className="h-3 w-3 ml-1" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start">
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(task, "todo");
-                                    }}
-                                    className={
-                                      task.status === "todo" ? "bg-accent" : ""
-                                    }
-                                  >
-                                    Not Started
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(task, "in_progress");
-                                    }}
-                                    className={
-                                      task.status === "in_progress"
-                                        ? "bg-accent"
-                                        : ""
-                                    }
-                                  >
-                                    In Progress
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStatusChange(task, "completed");
-                                    }}
-                                    className={
-                                      task.status === "completed"
-                                        ? "bg-accent"
-                                        : ""
-                                    }
-                                  >
-                                    Completed
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                              <Badge
-                                variant="secondary"
-                                className={`text-xs ${getPriorityColor(task.priority)}`}
-                              >
-                                {task.priority}
-                              </Badge>
-                              {(task.estimateHours || task.estimateMinutes) && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Clock className="h-3 w-3" />
-                                  {task.estimateHours}h {task.estimateMinutes}m
-                                </span>
-                              )}
-                              {attachmentCount > 0 && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Paperclip className="h-3 w-3" />
-                                  {attachmentCount}
-                                </span>
-                              )}
-                              {checklistProgress && (
-                                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <ListChecks className="h-3 w-3" />
-                                  {checklistProgress.completed}/
-                                  {checklistProgress.total}
-                                </span>
-                              )}
-                            </div>
-
-                            {checklistProgress && (
-                              <Progress
-                                value={checklistProgress.percentage}
-                                className="h-1 mt-2"
-                              />
-                            )}
-
-                            {task.checklist && task.checklist.length > 0 && (
-                              <div
-                                className="mt-2 space-y-1"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {task.checklist.slice(0, 3).map((item) => (
-                                  <div
-                                    key={item.id}
-                                    className="flex items-center gap-2"
-                                    data-testid={`checklist-item-card-${item.id}`}
-                                  >
-                                    <Checkbox
-                                      checked={item.completed}
-                                      onCheckedChange={() =>
-                                        handleToggleChecklistItemOnCard(task, item.id)
-                                      }
-                                      className="h-3.5 w-3.5"
-                                      data-testid={`checkbox-checklist-${item.id}`}
-                                    />
-                                    <span
-                                      className={`text-xs truncate ${item.completed
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p
+                                      className={`font-medium text-sm truncate ${task.status === "completed"
                                         ? "line-through text-muted-foreground"
                                         : ""
                                         }`}
+                                      data-testid={`text-task-title-${task.id}`}
                                     >
-                                      {item.title}
-                                    </span>
+                                      {task.title}
+                                    </p>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger
+                                        asChild
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 flex-shrink-0"
+                                        >
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenEditTask(task);
+                                          }}
+                                        >
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Edit Customer
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => handleViewHistory(task, e)}
+                                        >
+                                          <History className="h-4 w-4 mr-2" />
+                                          View History
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => handleCloneTask(task, e)}
+                                          data-testid={`button-clone-task-${task.id}`}
+                                        >
+                                          <Copy className="h-4 w-4 mr-2" />
+                                          Clone Customer
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-destructive"
+                                          onClick={(e) => handleDeleteTask(task, e)}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete Customer
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   </div>
-                                ))}
-                                {task.checklist.length > 3 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    +{task.checklist.length - 3} more items
-                                  </span>
-                                )}
-                              </div>
-                            )}
 
-                            {(task.startDate || task.dueDate) && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                                <Calendar className="h-3 w-3" />
-                                {task.startDate &&
-                                  new Date(task.startDate).toLocaleDateString()}
-                                {task.startDate && task.dueDate && " - "}
-                                {task.dueDate &&
-                                  new Date(task.dueDate).toLocaleDateString()}
-                              </div>
-                            )}
+                                  {task.description && (
+                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                      {task.description}
+                                    </p>
+                                  )}
 
-                            {assignees.length > 0 && (
-                              <div className="flex items-center gap-1 mt-2">
-                                <div className="flex -space-x-2">
-                                  {assignees.slice(0, 3).map((assignee) => (
-                                    <Avatar
-                                      key={assignee.id}
-                                      className="h-5 w-5 border-2 border-white dark:border-slate-800"
+                                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger
+                                        asChild
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Button
+                                          variant="secondary"
+                                          className={`text-xs h-6 px-2 rounded-md border-0 ${getStatusColor(task.status)} no-default-hover-elevate no-default-active-elevate hover:brightness-95 transition-all`}
+                                          data-testid={`badge-status-${task.id}`}
+                                        >
+                                          {task.status === "completed" && (
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                          )}
+                                          {task.status === "in_progress" && (
+                                            <Clock className="h-3 w-3 mr-1" />
+                                          )}
+                                          {getStatusLabel(task.status)}
+                                          <ChevronDown className="h-3 w-3 ml-1" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="start">
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(task, "todo");
+                                          }}
+                                          className={
+                                            task.status === "todo" ? "bg-accent" : ""
+                                          }
+                                        >
+                                          Not Started
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(task, "in_progress");
+                                          }}
+                                          className={
+                                            task.status === "in_progress"
+                                              ? "bg-accent"
+                                              : ""
+                                          }
+                                        >
+                                          In Progress
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(task, "completed");
+                                          }}
+                                          className={
+                                            task.status === "completed"
+                                              ? "bg-accent"
+                                              : ""
+                                          }
+                                        >
+                                          Completed
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <Badge
+                                      variant="secondary"
+                                      className={`text-xs ${getPriorityColor(task.priority)}`}
                                     >
-                                      <AvatarImage
-                                        src={assignee.avatar || undefined}
-                                      />
-                                      <AvatarFallback className="text-xs">
-                                        {assignee.name.charAt(0)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ))}
-                                  {assignees.length > 3 && (
-                                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-white dark:border-slate-800">
-                                      +{assignees.length - 3}
+                                      {task.priority}
+                                    </Badge>
+                                    {(task.estimateHours || task.estimateMinutes) && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Clock className="h-3 w-3" />
+                                        {task.estimateHours}h {task.estimateMinutes}m
+                                      </span>
+                                    )}
+                                    {attachmentCount > 0 && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Paperclip className="h-3 w-3" />
+                                        {attachmentCount}
+                                      </span>
+                                    )}
+                                    {checklistProgress && (
+                                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <ListChecks className="h-3 w-3" />
+                                        {checklistProgress.completed}/
+                                        {checklistProgress.total}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {checklistProgress && (
+                                    <Progress
+                                      value={checklistProgress.percentage}
+                                      className="h-1 mt-2"
+                                    />
+                                  )}
+
+                                  {task.checklist && task.checklist.length > 0 && (
+                                    <div
+                                      className="mt-2 space-y-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {task.checklist.slice(0, 3).map((item) => (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-center gap-2"
+                                          data-testid={`checklist-item-card-${item.id}`}
+                                        >
+                                          <Checkbox
+                                            checked={item.completed}
+                                            onCheckedChange={() =>
+                                              handleToggleChecklistItemOnCard(task, item.id)
+                                            }
+                                            className="h-3.5 w-3.5"
+                                            data-testid={`checkbox-checklist-${item.id}`}
+                                          />
+                                          <span
+                                            className={`text-xs truncate ${item.completed
+                                              ? "line-through text-muted-foreground"
+                                              : ""
+                                              }`}
+                                          >
+                                            {item.title}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {task.checklist.length > 3 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          +{task.checklist.length - 3} more items
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {(task.startDate || task.dueDate) && (
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                                      <Calendar className="h-3 w-3" />
+                                      {task.startDate &&
+                                        new Date(task.startDate).toLocaleDateString()}
+                                      {task.startDate && task.dueDate && " - "}
+                                      {task.dueDate &&
+                                        new Date(task.dueDate).toLocaleDateString()}
+                                    </div>
+                                  )}
+
+                                  {assignees.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2">
+                                      <div className="flex -space-x-2">
+                                        {assignees.slice(0, 3).map((assignee) => (
+                                          <Avatar
+                                            key={assignee.id}
+                                            className="h-5 w-5 border-2 border-white dark:border-slate-800"
+                                          >
+                                            <AvatarImage
+                                              src={assignee.avatar || undefined}
+                                            />
+                                            <AvatarFallback className="text-xs">
+                                              {assignee.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                        ))}
+                                        {assignees.length > 3 && (
+                                          <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-white dark:border-slate-800">
+                                            +{assignees.length - 3}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        {assignees.length === 1
+                                          ? assignees[0].name
+                                          : `${assignees.length} assignees`}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
-                                <span className="text-xs text-muted-foreground ml-1">
-                                  {assignees.length === 1
-                                    ? assignees[0].name
-                                    : `${assignees.length} assignees`}
-                                </span>
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          ))}
+                            </Card>
+                          </motion.div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {/* Render Active Tasks */}
+                          {activeTasks.map(renderTaskCard)}
+
+                          {/* Divider for Completed Tasks */}
+                          {completedTasks.length > 0 && (
+                            <div className="pt-4 pb-2">
+                              <div
+                                className="flex items-center gap-2 cursor-pointer group"
+                                onClick={() => setExpandedBuckets(prev => ({ ...prev, [bucket.id]: !isExpanded }))}
+                              >
+                                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700 group-hover:bg-primary/40 transition-colors" />
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                                  {isExpanded ? <ChevronDown className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                                  Completed ({completedTasks.length})
+                                </div>
+                                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700 group-hover:bg-primary/40 transition-colors" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Render Completed Tasks (Foldable) */}
+                          {isExpanded && completedTasks.map(renderTaskCard)}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                </div>
+              </motion.div>
+            )
+          })}
 
           <div
             className="flex items-center justify-center w-80 min-h-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
@@ -1456,14 +1532,13 @@ export default function ProjectBoard() {
           >
             <div className="text-center text-muted-foreground">
               <Plus className="h-8 w-8 mx-auto mb-2" />
-              <p>Add Bucket</p>
+              <p>Add Stage</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* New Task Dialog */}
-      {/* New Task Dialog - Modern & Mobile Friendly */}
       <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
         <DialogContent className="max-w-3xl w-[95vw] p-0 flex flex-col h-[90vh] md:h-[85vh] overflow-hidden rounded-2xl border-none shadow-2xl bg-white dark:bg-slate-950">
 
@@ -1472,7 +1547,7 @@ export default function ProjectBoard() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Create New Task</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Create New Customer</span>
               </div>
               <Button
                 variant="ghost"
@@ -1485,7 +1560,7 @@ export default function ProjectBoard() {
             </div>
             <Input
               className="text-xl md:text-2xl font-bold bg-transparent border-none p-0 focus-visible:ring-0 shadow-none h-auto placeholder:opacity-20"
-              placeholder="Task title..."
+              placeholder="Customer title..."
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
             />
@@ -1594,7 +1669,7 @@ export default function ProjectBoard() {
                 <div className="absolute left-0 top-6 bottom-6 w-1 bg-primary rounded-r-full" />
                 <div className="mb-4">
                   <h4 className="text-[12px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">Operational Data</h4>
-                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific bucket fields.</p>
+                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific Stage fields.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-y-4">
                   {selectedBucketId && (
@@ -1611,7 +1686,7 @@ export default function ProjectBoard() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4 opacity-50" /> Task Description
+                    <FileText className="h-4 w-4 opacity-50" /> Customer Description
                   </label>
                   <Textarea
                     placeholder="Enter detailed notes..."
@@ -1696,7 +1771,7 @@ export default function ProjectBoard() {
                 onClick={handleAddTask}
                 disabled={createTaskMutation.isPending}
               >
-                {createTaskMutation.isPending ? "Creating..." : "Add Task"}
+                {createTaskMutation.isPending ? "Creating..." : "Add Customer"}
               </Button>
             </div>
           </DialogFooter>
@@ -1712,7 +1787,7 @@ export default function ProjectBoard() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Task Details</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Customer Details</span>
               </div>
               {/* Close Button */}
               <Button
@@ -1726,7 +1801,7 @@ export default function ProjectBoard() {
             </div>
             <Input
               className="text-xl md:text-2xl font-bold bg-transparent border-none p-0 focus-visible:ring-0 shadow-none h-auto placeholder:opacity-20"
-              placeholder="Task title..."
+              placeholder="Customer title..."
               value={editTaskTitle}
               onChange={(e) => setEditTaskTitle(e.target.value)}
             />
@@ -1835,7 +1910,7 @@ export default function ProjectBoard() {
                 <div className="absolute left-0 top-6 bottom-6 w-1 bg-primary rounded-r-full" />
                 <div className="mb-4">
                   <h4 className="text-[12px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">Operational Data</h4>
-                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific bucket fields.</p>
+                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific Stage fields.</p>
                 </div>
                 <div className="grid grid-cols-1 gap-y-4">
                   {editingTask?.bucketId && (
@@ -1852,7 +1927,7 @@ export default function ProjectBoard() {
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4 opacity-50" /> Task Description
+                    <FileText className="h-4 w-4 opacity-50" /> Customer Description
                   </label>
                   <Textarea
                     placeholder="Enter detailed notes..."
@@ -1950,7 +2025,7 @@ export default function ProjectBoard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              Task History
+              Customer History
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
@@ -2024,3 +2099,6 @@ export default function ProjectBoard() {
     </div>
   );
 }
+
+
+

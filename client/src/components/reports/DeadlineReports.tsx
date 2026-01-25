@@ -196,7 +196,7 @@ export default function DeadlineReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tasks in Range
+                  Customers in Range
                 </CardTitle>
                 <Calendar className="h-4 w-4 text-primary" />
               </CardHeader>
@@ -211,7 +211,7 @@ export default function DeadlineReports({
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Overdue Tasks
+                  Overdue Customers
                 </CardTitle>
                 <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
@@ -246,7 +246,7 @@ export default function DeadlineReports({
               <CardContent>
                 <div className="text-2xl font-bold">{avgDelay} days</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  For overdue tasks
+                  For overdue Customers
                 </p>
               </CardContent>
             </Card>
@@ -328,3 +328,4 @@ export default function DeadlineReports({
     </div>
   );
 }
+

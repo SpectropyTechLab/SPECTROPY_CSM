@@ -144,7 +144,7 @@ export default function Settings() {
               <div className="space-y-0.5">
                 <Label htmlFor="email-notifications">Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">
-                  Receive email notifications for task assignments
+                  Receive email notifications for Customer assignments
                 </p>
               </div>
               <Switch
@@ -156,9 +156,9 @@ export default function Settings() {
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="task-reminders">Task Reminders</Label>
+                <Label htmlFor="task-reminders">Customer Reminders</Label>
                 <p className="text-sm text-muted-foreground">
-                  Get reminders for upcoming task deadlines
+                  Get reminders for upcoming Customer deadlines
                 </p>
               </div>
               <Switch
@@ -315,3 +315,4 @@ export default function Settings() {
     </div>
   );
 }
+

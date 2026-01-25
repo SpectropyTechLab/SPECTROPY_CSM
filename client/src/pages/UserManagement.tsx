@@ -18,10 +18,10 @@ import {
 } from "@/components/ui/select";
 
 const PERMISSION_LABELS: Record<string, { label: string; description: string }> = {
-  CREATE_TASK: { label: "Create Tasks", description: "Can create new tasks in projects" },
-  UPDATE_TASK: { label: "Update Tasks", description: "Can edit task details" },
-  COMPLETE_TASK: { label: "Complete Tasks", description: "Can mark tasks as complete/incomplete" },
-  DELETE_TASK: { label: "Delete Tasks", description: "Can remove tasks" },
+  CREATE_TASK: { label: "Create Customers", description: "Can create new customers in projects" },
+  UPDATE_TASK: { label: "Update Customers", description: "Can edit customer details" },
+  COMPLETE_TASK: { label: "Complete Customers", description: "Can mark customers as complete/incomplete" },
+  DELETE_TASK: { label: "Delete Customers", description: "Can remove customers" },
   CREATE_PROJECT: { label: "Create Projects", description: "Can create new projects" },
   UPDATE_PROJECT: { label: "Update Projects", description: "Can edit project details" },
   DELETE_PROJECT: { label: "Delete Projects", description: "Can remove projects" },
@@ -332,3 +332,4 @@ export default function UserManagement() {
     </div>
   );
 }
+

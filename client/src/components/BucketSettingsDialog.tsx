@@ -123,7 +123,7 @@ export default function BucketSettingsDialog({ bucketId, currentConfig }: Bucket
                 <DialogHeader>
                     <DialogTitle>Configure Custom Fields</DialogTitle>
                     <DialogDescription>
-                        Define custom fields for tasks in this bucket.
+                        Define custom fields for Customers in this Stage.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -265,7 +265,7 @@ export default function BucketSettingsDialog({ bucketId, currentConfig }: Bucket
                                                         />
                                                     </FormControl>
                                                     <FormLabel className="!mt-0 font-normal">
-                                                        Copy to next bucket on completion
+                                                        Copy to next Stage on completion
                                                     </FormLabel>
                                                 </FormItem>
                                             )}
