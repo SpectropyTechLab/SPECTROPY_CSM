@@ -10,6 +10,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { downloadAttachment } from "../hooks/use-download";
+import BucketSettingsDialog from "@/components/BucketSettingsDialog";
+import DynamicCustomFields from "@/components/DynamicCustomFields";
+import { parseCustomFields, serializeCustomFields } from "@shared/customFieldsUtils";
+
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 
 import {
   Dialog,
@@ -116,11 +127,16 @@ export default function ProjectBoard() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("medium");
+  const [newTaskStatus, setNewTaskStatus] = useState("todo");
   const [newTaskAssignees, setNewTaskAssignees] = useState<number[]>([]);
   const [newTaskStartDate, setNewTaskStartDate] = useState("");
   const [newTaskEndDate, setNewTaskEndDate] = useState("");
   const [newTaskEstimateHours, setNewTaskEstimateHours] = useState(0);
   const [newTaskEstimateMinutes, setNewTaskEstimateMinutes] = useState(0);
+  const [newTaskChecklist, setNewTaskChecklist] = useState<ChecklistItem[]>([]);
+  const [newTaskAttachments, setNewTaskAttachments] = useState<Attachment[]>([]);
+  const [newTaskCustomFields, setNewTaskCustomFields] = useState<Record<string, any>>({});
+  const [newTaskChecklistItem, setNewTaskChecklistItem] = useState("");
   const [newBucketTitle, setNewBucketTitle] = useState("");
   const [editingBucketId, setEditingBucketId] = useState<number | null>(null);
   const [editingBucketTitle, setEditingBucketTitle] = useState("");
@@ -139,21 +155,35 @@ export default function ProjectBoard() {
   const [editTaskAttachments, setEditTaskAttachments] = useState<Attachment[]>(
     [],
   );
+  const [editTaskCustomFields, setEditTaskCustomFields] = useState<Record<string, any>>({});
   const [newChecklistItem, setNewChecklistItem] = useState("");
 
-  const { uploadFile, isUploading } = useUpload({
+  const { uploadFile: uploadNewFile, isUploading: isUploadingNew } = useUpload({
     onSuccess: (response) => {
-      if (editingTask) {
-        const newAttachment: Attachment = {
-          id: crypto.randomUUID(),
-          name: response.metadata.name,
-          url: response.objectPath,
-          type: response.metadata.contentType,
-          size: response.metadata.size,
-          uploadedAt: new Date().toISOString(),
-        };
-        setEditTaskAttachments([...editTaskAttachments, newAttachment]);
-      }
+      const newAttachment: Attachment = {
+        id: crypto.randomUUID(),
+        name: response.metadata.name,
+        url: response.objectPath,
+        type: response.metadata.contentType,
+        size: response.metadata.size,
+        uploadedAt: new Date().toISOString(),
+      };
+      setNewTaskAttachments((prev) => [...prev, newAttachment]);
+    },
+  });
+
+  const { uploadFile: uploadEditFile, isUploading: isUploadingEdit } = useUpload({
+    onSuccess: (response) => {
+      if (!editingTask) return;
+      const newAttachment: Attachment = {
+        id: crypto.randomUUID(),
+        name: response.metadata.name,
+        url: response.objectPath,
+        type: response.metadata.contentType,
+        size: response.metadata.size,
+        uploadedAt: new Date().toISOString(),
+      };
+      setEditTaskAttachments((prev) => [...prev, newAttachment]);
     },
   });
 
@@ -183,6 +213,7 @@ export default function ProjectBoard() {
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
+      console.log("***********data*************", data);
       const res = await apiRequest("POST", "/api/tasks", data);
       return res.json();
     },
@@ -251,11 +282,16 @@ export default function ProjectBoard() {
     setNewTaskTitle("");
     setNewTaskDescription("");
     setNewTaskPriority("medium");
+    setNewTaskStatus("todo");
     setNewTaskAssignees([]);
     setNewTaskStartDate("");
     setNewTaskEndDate("");
     setNewTaskEstimateHours(0);
     setNewTaskEstimateMinutes(0);
+    setNewTaskChecklist([]);
+    setNewTaskAttachments([]);
+    setNewTaskCustomFields({});
+    setNewTaskChecklistItem("");
   };
 
   const handleSaveBucketTitle = (bucketId: number) => {
@@ -332,16 +368,19 @@ export default function ProjectBoard() {
       assigneeId: newTaskAssignees[0] || undefined,
       assignedUsers: newTaskAssignees,
       position: maxPosition + 1,
-      status: "todo",
+      status: newTaskStatus,
       startDate: newTaskStartDate
         ? new Date(newTaskStartDate + "T12:00:00")
         : null,
       dueDate: newTaskEndDate ? new Date(newTaskEndDate + "T12:00:00") : null,
       estimateHours: newTaskEstimateHours,
       estimateMinutes: newTaskEstimateMinutes,
+      checklist: newTaskChecklist,
+      attachments: newTaskAttachments,
+      customFields: Object.keys(newTaskCustomFields).length > 0
+        ? serializeCustomFields(newTaskCustomFields)
+        : undefined,
       history: [createHistoryEntry("Created")],
-      checklist: [],
-      attachments: [],
     });
   };
 
@@ -354,6 +393,82 @@ export default function ProjectBoard() {
       projectId,
       position: maxPosition + 1,
     });
+  };
+
+  const getCustomFieldValuesForBucket = (
+    customFieldsString: string | null,
+    bucketId?: number | null,
+  ): Record<string, any> => {
+    const parsed = parseCustomFields(customFieldsString);
+    const bucket = buckets.find((b) => b.id === bucketId);
+    const configs = bucket?.customFieldsConfig || [];
+    if (configs.length === 0) return parsed;
+
+    const result: Record<string, any> = { ...parsed };
+    for (const field of configs) {
+      const value = parsed[field.key];
+      if (value === undefined) continue;
+      if (field.type === "checkbox") {
+        result[field.key] = value === "true";
+      } else if (field.type === "number") {
+        const numericValue = Number(value);
+        result[field.key] = Number.isNaN(numericValue) ? value : numericValue;
+      }
+    }
+
+    return result;
+  };
+
+  const getCustomFieldsForConfig = (
+    customFieldsString: string | null,
+    config: Bucket["customFieldsConfig"],
+  ): Record<string, string> => {
+    const parsed = parseCustomFields(customFieldsString);
+    if (!config || config.length === 0) {
+      return parsed;
+    }
+
+    const allowedKeys = new Set(config.map((field) => field.key));
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([key]) => allowedKeys.has(key)),
+    );
+  };
+
+  const ensureNextBucketCustomFields = async (
+    task: Task,
+    nextBucket: Bucket,
+  ): Promise<string | undefined> => {
+    const currentBucket = buckets.find((b) => b.id === task.bucketId);
+    const currentConfig = currentBucket?.customFieldsConfig || [];
+    const nextConfig = nextBucket.customFieldsConfig || [];
+    let mergedConfig = nextConfig;
+
+    if (currentConfig.length > 0) {
+      const nextKeys = new Set(nextConfig.map((field) => field.key));
+      const missing = currentConfig.filter((field) => !nextKeys.has(field.key));
+      if (missing.length > 0) {
+        mergedConfig = [...nextConfig, ...missing];
+        try {
+          await updateBucketMutation.mutateAsync({
+            id: nextBucket.id,
+            customFieldsConfig: mergedConfig,
+          });
+        } catch (error) {
+          toast({
+            title: "Custom fields update failed",
+            description:
+              "Could not sync custom fields to the next bucket. Task will still be created.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+
+    if (!task.customFields) return undefined;
+    const filtered = getCustomFieldsForConfig(task.customFields, mergedConfig);
+    return Object.keys(filtered).length > 0
+      ? serializeCustomFields(filtered)
+      : undefined;
   };
 
   const handleOpenEditTask = (task: Task) => {
@@ -385,6 +500,9 @@ export default function ProjectBoard() {
     setEditTaskEstimateMinutes(task.estimateMinutes || 0);
     setEditTaskChecklist(task.checklist || []);
     setEditTaskAttachments(task.attachments || []);
+    setEditTaskCustomFields(
+      getCustomFieldValuesForBucket(task.customFields ?? null, task.bucketId),
+    );
     setIsEditTaskOpen(true);
   };
 
@@ -407,6 +525,9 @@ export default function ProjectBoard() {
       estimateMinutes: editTaskEstimateMinutes,
       checklist: editTaskChecklist,
       attachments: editTaskAttachments,
+      customFields: Object.keys(editTaskCustomFields).length > 0
+        ? serializeCustomFields(editTaskCustomFields)
+        : undefined,
       history: [...(editingTask.history || []), createHistoryEntry("Updated")],
     });
     setIsEditTaskOpen(false);
@@ -555,6 +676,7 @@ export default function ProjectBoard() {
       const nextBucket = buckets[currentBucketIndex + 1];
 
       if (nextBucket) {
+        const customFields = await ensureNextBucketCustomFields(task, nextBucket);
         const newTaskData = {
           title: task.title,
           description: task.description || "",
@@ -569,6 +691,7 @@ export default function ProjectBoard() {
           estimateMinutes: task.estimateMinutes || 0,
           checklist: [],
           attachments: [],
+          customFields,
           history: [
             createHistoryEntry(
               `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
@@ -643,6 +766,7 @@ export default function ProjectBoard() {
       const nextBucket = buckets[currentBucketIndex + 1];
 
       if (nextBucket) {
+        const customFields = await ensureNextBucketCustomFields(task, nextBucket);
         const newTaskData = {
           title: task.title,
           description: task.description || "",
@@ -657,6 +781,7 @@ export default function ProjectBoard() {
           estimateMinutes: task.estimateMinutes || 0,
           checklist: [],
           attachments: [],
+          customFields,
           history: [
             createHistoryEntry(
               `Auto-created from completed task in ${buckets[currentBucketIndex]?.title || "previous bucket"}`,
@@ -667,6 +792,31 @@ export default function ProjectBoard() {
         createTaskMutation.mutate(newTaskData);
       }
     }
+  };
+
+  const handleAddNewChecklistItem = () => {
+    if (!newTaskChecklistItem.trim()) return;
+    const item: ChecklistItem = {
+      id: crypto.randomUUID(),
+      title: newTaskChecklistItem,
+      completed: false,
+    };
+    setNewTaskChecklist((prev) => [...prev, item]);
+    setNewTaskChecklistItem("");
+  };
+
+  const handleToggleNewChecklistItem = (itemId: string) => {
+    setNewTaskChecklist(
+      newTaskChecklist.map((item) =>
+        item.id === itemId ? { ...item, completed: !item.completed } : item,
+      ),
+    );
+  };
+
+  const handleRemoveNewChecklistItem = (itemId: string) => {
+    setNewTaskChecklist(
+      newTaskChecklist.filter((item) => item.id !== itemId),
+    );
   };
 
   const handleAddChecklistItem = () => {
@@ -694,13 +844,19 @@ export default function ProjectBoard() {
     );
   };
 
+  const handleRemoveNewAttachment = (attachmentId: string) => {
+    setNewTaskAttachments(
+      newTaskAttachments.filter((att) => att.id !== attachmentId),
+    );
+  };
+
   const handleRemoveAttachment = (attachmentId: string) => {
     setEditTaskAttachments(
       editTaskAttachments.filter((att) => att.id !== attachmentId),
     );
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNewFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -709,7 +865,20 @@ export default function ProjectBoard() {
       return;
     }
 
-    await uploadFile(file);
+    await uploadNewFile(file);
+    e.target.value = "";
+  };
+
+  const handleEditFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size exceeds 10MB limit");
+      return;
+    }
+
+    await uploadEditFile(file);
     e.target.value = "";
   };
 
@@ -943,6 +1112,19 @@ export default function ProjectBoard() {
                         <Edit className="h-4 w-4 mr-2" />
                         Rename Bucket
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {/* ADD THIS - Custom Fields Settings */}
+                      <DropdownMenuItem
+                        onSelect={(e) => e.preventDefault()}
+                        className="p-0"
+                      >
+                        <BucketSettingsDialog
+                          bucketId={bucket.id}
+                          currentConfig={bucket.customFieldsConfig || []}
+                        />
+                      </DropdownMenuItem>
+
+                      {/* END ADD */}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"
@@ -1281,447 +1463,483 @@ export default function ProjectBoard() {
       </div>
 
       {/* New Task Dialog */}
+      {/* New Task Dialog - Modern & Mobile Friendly */}
       <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
-        <DialogContent className="max-w-lg w-[95vw] sm:w-full max-h-[90vh] overflow-scroll flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Add New Task</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4 flex-1 overflow-y-auto">
+        <DialogContent className="max-w-3xl w-[95vw] p-0 flex flex-col h-[90vh] md:h-[85vh] overflow-hidden rounded-2xl border-none shadow-2xl bg-white dark:bg-slate-950">
+
+          {/* 1. FIXED HEADER */}
+          <DialogHeader className="p-4 md:p-6 border-b shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Create New Task</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsNewTaskOpen(false)}
+              >
+
+              </Button>
+            </div>
             <Input
+              className="text-xl md:text-2xl font-bold bg-transparent border-none p-0 focus-visible:ring-0 shadow-none h-auto placeholder:opacity-20"
               placeholder="Task title..."
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
-              data-testid="input-task-title"
             />
-            <Textarea
-              placeholder="Description (optional)..."
-              value={newTaskDescription}
-              onChange={(e) => setNewTaskDescription(e.target.value)}
-              data-testid="input-task-description"
-            />
-            <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
-              <SelectTrigger data-testid="select-task-priority">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
+          </DialogHeader>
 
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                <Users className="h-4 w-4 inline mr-2" />
-                Assign Users
-              </label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between"
-                    data-testid="button-assign-users-new"
-                  >
-                    <span className="truncate">
-                      {newTaskAssignees.length === 0
-                        ? "Select users..."
-                        : `${newTaskAssignees.length} user${newTaskAssignees.length > 1 ? "s" : ""} selected`}
-                    </span>
-                    <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-64 p-2" align="start">
-                  <div className="space-y-1">
-                    {users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
-                        onClick={() =>
-                          toggleAssignee(
-                            user.id,
-                            newTaskAssignees,
-                            setNewTaskAssignees,
-                          )
-                        }
-                      >
-                        <Checkbox
-                          checked={newTaskAssignees.includes(user.id)}
-                          onCheckedChange={() =>
-                            toggleAssignee(
-                              user.id,
-                              newTaskAssignees,
-                              setNewTaskAssignees,
-                            )
-                          }
+          {/* 2. SCROLLABLE BODY */}
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+
+              {/* ROW 1: STATUS, ASSIGNEES, & PRIORITY */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                  <Select value={newTaskStatus} onValueChange={setNewTaskStatus}>
+                    <SelectTrigger className="w-full bg-slate-50 dark:bg-slate-900 border-none h-10 rounded-lg">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">Not Started</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Assign Members</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg font-normal">
+                        <span className="truncate">{newTaskAssignees.length === 0 ? "Search members..." : `${newTaskAssignees.length} Selected`}</span>
+                        <Users className="h-4 w-4 opacity-40" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0 shadow-xl border-slate-200 dark:border-slate-800" align="start">
+                      <div className="p-2 border-b bg-slate-50 dark:bg-slate-900">
+                        <Input
+                          placeholder="Search by name..."
+                          className="h-8 text-xs border-none bg-white dark:bg-slate-800"
+                          onChange={(e) => {
+                            const val = e.target.value.toLowerCase();
+                            document.querySelectorAll('.user-search-item-new').forEach((item: any) => {
+                              item.style.display = item.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+                            });
+                          }}
                         />
-                        <span className="text-sm">{user.name}</span>
+                      </div>
+                      <ScrollArea className="h-48 p-2 bg-white dark:bg-slate-950">
+                        {users.map((user) => (
+                          <div key={user.id} className="user-search-item-new flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-md cursor-pointer transition-colors"
+                            onClick={() => toggleAssignee(user.id, newTaskAssignees, setNewTaskAssignees)}>
+                            <Checkbox checked={newTaskAssignees.includes(user.id)} />
+                            <span className="text-sm">{user.name}</span>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
+                  <Select value={newTaskPriority} onValueChange={setNewTaskPriority}>
+                    <SelectTrigger className={`w-full border-none h-10 rounded-lg text-white font-medium ${getPriorityColor(newTaskPriority)}`}>
+                      <SelectValue placeholder="Select Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* ROW 2: DATES & ESTIMATES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-3 w-3" /> Start Date
+                    </label>
+                    <Input type="date" value={newTaskStartDate} onChange={(e) => setNewTaskStartDate(e.target.value)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-sm" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-3 w-3" /> End Date
+                    </label>
+                    <Input type="date" value={newTaskEndDate} onChange={(e) => setNewTaskEndDate(e.target.value)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-sm" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Allocation (Hrs/Min)</label>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" placeholder="Hr" value={newTaskEstimateHours || ""} onChange={(e) => setNewTaskEstimateHours(Number(e.target.value) || 0)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-center" />
+                    <span className="text-xs font-bold opacity-30">H</span>
+                    <Input type="number" placeholder="Min" value={newTaskEstimateMinutes || ""} onChange={(e) => setNewTaskEstimateMinutes(Number(e.target.value) || 0)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-center" />
+                    <span className="text-xs font-bold opacity-30">M</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* OPERATIONAL DATA SECTION */}
+              <div className="relative p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                <div className="absolute left-0 top-6 bottom-6 w-1 bg-primary rounded-r-full" />
+                <div className="mb-4">
+                  <h4 className="text-[12px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">Operational Data</h4>
+                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific bucket fields.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-y-4">
+                  {selectedBucketId && (
+                    <DynamicCustomFields
+                      bucketId={selectedBucketId}
+                      existingValues={newTaskCustomFields}
+                      onChange={setNewTaskCustomFields}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* DESCRIPTION & CHECKLIST */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4 opacity-50" /> Task Description
+                  </label>
+                  <Textarea
+                    placeholder="Enter detailed notes..."
+                    className="min-h-[120px] bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800 resize-none rounded-xl text-sm focus-visible:ring-primary"
+                    value={newTaskDescription}
+                    onChange={(e) => setNewTaskDescription(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 opacity-50" /> Checklist
+                  </label>
+                  <div className="space-y-2">
+                    {newTaskChecklist.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl group transition-all hover:bg-slate-100">
+                        <Checkbox checked={item.completed} onCheckedChange={() => handleToggleNewChecklistItem(item.id)} />
+                        <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : "text-slate-700 dark:text-slate-200"}`}>{item.title}</span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveNewChecklistItem(item.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
+                    <div className="flex items-center gap-2 mt-2 bg-white dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 focus-within:ring-1 focus-within:ring-primary">
+                      <Plus className="h-4 w-4 text-primary" />
+                      <Input
+                        placeholder="Add item to checklist..."
+                        className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-sm p-0 w-full"
+                        value={newTaskChecklistItem}
+                        onChange={(e) => setNewTaskChecklistItem(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddNewChecklistItem()}
+                      />
+                    </div>
                   </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                  Start Date
+              {/* ATTACHMENTS */}
+              <div className="space-y-4 pb-6">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 opacity-50" /> Resources & Files
                 </label>
-                <Input
-                  type="date"
-                  value={newTaskStartDate}
-                  onChange={(e) => setNewTaskStartDate(e.target.value)}
-                  data-testid="input-task-start-date"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                  End Date
-                </label>
-                <Input
-                  type="date"
-                  value={newTaskEndDate}
-                  onChange={(e) => setNewTaskEndDate(e.target.value)}
-                  data-testid="input-task-end-date"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {newTaskAttachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm group">
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg text-slate-500">
+                        {getFileIcon(att.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[11px] font-bold truncate block w-full text-slate-700 dark:text-slate-200">
+                          {att.name}
+                        </span>
+                        <p className="text-[9px] text-muted-foreground uppercase">{(att.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => handleRemoveNewAttachment(att.id)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:border-primary/50 cursor-pointer transition-all group min-h-[80px]">
+                    <input type="file" className="hidden" onChange={handleNewFileUpload} disabled={isUploadingNew} />
+                    <div className="flex items-center gap-2">
+                      <Upload className={`h-4 w-4 ${isUploadingNew ? "animate-bounce" : "text-slate-400 group-hover:text-primary"}`} />
+                      <span className="text-xs font-bold text-slate-500 group-hover:text-slate-700">
+                        {isUploadingNew ? "Uploading..." : "Add File"}
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
+          </ScrollArea>
 
-            <div>
-              <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                Time Estimate
-              </label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="Hours"
-                  value={newTaskEstimateHours || ""}
-                  onChange={(e) =>
-                    setNewTaskEstimateHours(Number(e.target.value) || 0)
-                  }
-                  className="w-24"
-                  data-testid="input-task-estimate-hours"
-                />
-                <span className="text-sm text-muted-foreground">h</span>
-                <Input
-                  type="number"
-                  min="0"
-                  max="59"
-                  placeholder="Minutes"
-                  value={newTaskEstimateMinutes || ""}
-                  onChange={(e) =>
-                    setNewTaskEstimateMinutes(Number(e.target.value) || 0)
-                  }
-                  className="w-24"
-                  data-testid="input-task-estimate-minutes"
-                />
-                <span className="text-sm text-muted-foreground">m</span>
-              </div>
+          {/* 3. FIXED FOOTER */}
+          <DialogFooter className="p-4 md:p-6 border-t bg-white dark:bg-slate-900 shrink-0">
+            <div className="flex w-full gap-3">
+              <DialogClose asChild>
+                <Button variant="ghost" className="flex-1 rounded-xl">Cancel</Button>
+              </DialogClose>
+              <Button
+                className="flex-[2] rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:brightness-110 transition-all"
+                onClick={handleAddTask}
+                disabled={createTaskMutation.isPending}
+              >
+                {createTaskMutation.isPending ? "Creating..." : "Add Task"}
+              </Button>
             </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button
-              onClick={handleAddTask}
-              disabled={createTaskMutation.isPending}
-              data-testid="button-submit-task"
-            >
-              Add Task
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditTaskOpen} onOpenChange={setIsEditTaskOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] sm:w-full max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Edit Task</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="flex-1 max-h-[65vh] overflow-scroll">
-            <div className="space-y-4 py-4 pr-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Status
-                </label>
-                <Select
-                  value={editTaskStatus}
-                  onValueChange={setEditTaskStatus}
-                >
-                  <SelectTrigger data-testid="select-edit-task-status">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">Not Started</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
+        <DialogContent className="max-w-3xl w-[95vw] p-0 flex flex-col h-[90vh] md:h-[85vh] overflow-hidden rounded-2xl border-none shadow-2xl bg-white dark:bg-slate-950">
+
+          {/* 1. FIXED HEADER */}
+          <DialogHeader className="p-4 md:p-6 border-b shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Task Details</span>
               </div>
-
-              <Input
-                placeholder="Task title..."
-                value={editTaskTitle}
-                onChange={(e) => setEditTaskTitle(e.target.value)}
-                data-testid="input-edit-task-title"
-              />
-              <Textarea
-                placeholder="Description (optional)..."
-                value={editTaskDescription}
-                onChange={(e) => setEditTaskDescription(e.target.value)}
-                data-testid="input-edit-task-description"
-              />
-
-              <Select
-                value={editTaskPriority}
-                onValueChange={setEditTaskPriority}
+              {/* Close Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsEditTaskOpen(false)}
               >
-                <SelectTrigger data-testid="select-edit-task-priority">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  <Users className="h-4 w-4 inline mr-2" />
-                  Assign Users
-                </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between"
-                      data-testid="button-assign-users-edit"
-                    >
-                      <span className="truncate">
-                        {editTaskAssignees.length === 0
-                          ? "Select users..."
-                          : `${editTaskAssignees.length} user${editTaskAssignees.length > 1 ? "s" : ""} selected`}
-                      </span>
-                      <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-2" align="start">
-                    <div className="space-y-1">
-                      {users.map((user) => (
-                        <div
-                          key={user.id}
-                          className="flex items-center gap-2 p-2 rounded hover-elevate cursor-pointer"
-                          onClick={() =>
-                            toggleAssignee(
-                              user.id,
-                              editTaskAssignees,
-                              setEditTaskAssignees,
-                            )
-                          }
-                        >
-                          <Checkbox
-                            checked={editTaskAssignees.includes(user.id)}
-                            onCheckedChange={() =>
-                              toggleAssignee(
-                                user.id,
-                                editTaskAssignees,
-                                setEditTaskAssignees,
-                              )
-                            }
-                          />
-                          <span className="text-sm">{user.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              </Button>
+            </div>
+            <Input
+              className="text-xl md:text-2xl font-bold bg-transparent border-none p-0 focus-visible:ring-0 shadow-none h-auto placeholder:opacity-20"
+              placeholder="Task title..."
+              value={editTaskTitle}
+              onChange={(e) => setEditTaskTitle(e.target.value)}
+            />
+          </DialogHeader>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                    Start Date
-                  </label>
-                  <Input
-                    type="date"
-                    value={editTaskStartDate}
-                    onChange={(e) => setEditTaskStartDate(e.target.value)}
-                    data-testid="input-edit-task-start-date"
-                  />
+          {/* 2. SCROLLABLE BODY */}
+          <ScrollArea className="flex-1 overflow-y-auto">
+            <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+
+              {/* ROW 1: STATUS, ASSIGNEES, & PRIORITY (Responsive Grid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                  <Select value={editTaskStatus} onValueChange={setEditTaskStatus}>
+                    <SelectTrigger className="w-full bg-slate-50 dark:bg-slate-900 border-none h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todo">Not Started</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                    End Date
-                  </label>
-                  <Input
-                    type="date"
-                    value={editTaskEndDate}
-                    onChange={(e) => setEditTaskEndDate(e.target.value)}
-                    data-testid="input-edit-task-end-date"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="text-sm font-medium text-muted-foreground mb-1 block">
-                  Time Estimate
-                </label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="Hours"
-                    value={editTaskEstimateHours || ""}
-                    onChange={(e) =>
-                      setEditTaskEstimateHours(Number(e.target.value) || 0)
-                    }
-                    className="w-24"
-                    data-testid="input-edit-task-estimate-hours"
-                  />
-                  <span className="text-sm text-muted-foreground">h</span>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="59"
-                    placeholder="Minutes"
-                    value={editTaskEstimateMinutes || ""}
-                    onChange={(e) =>
-                      setEditTaskEstimateMinutes(Number(e.target.value) || 0)
-                    }
-                    className="w-24"
-                    data-testid="input-edit-task-estimate-minutes"
-                  />
-                  <span className="text-sm text-muted-foreground">m</span>
-                </div>
-              </div>
-
-              {/* Checklist Section */}
-              <div className="border rounded-lg p-4">
-                <label className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <ListChecks className="h-4 w-4" />
-                  Checklist
-                </label>
-                <div className="space-y-2 mt-2">
-                  {editTaskChecklist.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <Checkbox
-                        checked={item.completed}
-                        onCheckedChange={() =>
-                          handleToggleChecklistItem(item.id)
-                        }
-                      />
-                      <span
-                        className={`flex-1 text-sm ${item.completed ? "line-through text-muted-foreground" : ""}`}
-                      >
-                        {item.title}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleRemoveChecklistItem(item.id)}
-                      >
-                        <X className="h-3 w-3" />
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Assign Members</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg font-normal">
+                        <span className="truncate">{editTaskAssignees.length === 0 ? "Search members..." : `${editTaskAssignees.length} Assigned`}</span>
+                        <Users className="h-4 w-4 opacity-40" />
                       </Button>
-                    </div>
-                  ))}
-                  <div className="flex items-center gap-2 mt-2">
-                    <Input
-                      placeholder="Add checklist item..."
-                      value={newChecklistItem}
-                      onChange={(e) => setNewChecklistItem(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleAddChecklistItem()
-                      }
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddChecklistItem}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0 shadow-xl border-slate-200 dark:border-slate-800" align="start">
+                      <div className="p-2 border-b bg-slate-50 dark:bg-slate-900">
+                        <Input
+                          placeholder="Search by name..."
+                          className="h-8 text-xs border-none bg-white dark:bg-slate-800"
+                          onChange={(e) => {
+                            const val = e.target.value.toLowerCase();
+                            document.querySelectorAll('.user-search-item').forEach((item: any) => {
+                              item.style.display = item.innerText.toLowerCase().includes(val) ? 'flex' : 'none';
+                            });
+                          }}
+                        />
+                      </div>
+                      <ScrollArea className="h-48 p-2 bg-white dark:bg-slate-950">
+                        {users.map((user) => (
+                          <div key={user.id} className="user-search-item flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-md cursor-pointer transition-colors"
+                            onClick={() => toggleAssignee(user.id, editTaskAssignees, setEditTaskAssignees)}>
+                            <Checkbox checked={editTaskAssignees.includes(user.id)} />
+                            <span className="text-sm">{user.name}</span>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Priority</label>
+                  <Select value={editTaskPriority} onValueChange={setEditTaskPriority}>
+                    <SelectTrigger className={`w-full border-none h-10 rounded-lg text-white font-medium ${getPriorityColor(editTaskPriority)}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              {/* Attachments Section */}
-              <div className="border rounded-lg p-4">
-                <label className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Paperclip className="h-4 w-4" />
-                  Attachments
-                </label>
-                <div className="space-y-2 mt-2">
-                  {editTaskAttachments.map((att) => (
-                    <div
-                      key={att.id}
-                      className="flex items-center gap-2 p-2 bg-muted rounded"
-                    >
-                      {getFileIcon(att.type)}
-                      <button
-                        className="flex-1 text-sm truncate text-left text-indigo-500 hover:underline"
-                        onClick={() => downloadAttachment(att.url, att.name)}
-                      >
-                        {att.name}
-                      </button>
-
-                      <span className="text-xs text-muted-foreground">
-                        {(att.size / 1024).toFixed(1)}KB
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleRemoveAttachment(att.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="mt-2">
-                    <label className="cursor-pointer">
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={handleFileUpload}
-                        disabled={isUploading}
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isUploading}
-                        asChild
-                      >
-                        <span>
-                          <Upload className="h-4 w-4 mr-2" />
-                          {isUploading ? "Uploading..." : "Upload File"}
-                        </span>
-                      </Button>
+              {/* ROW 2: DATES & ESTIMATES (Responsive Grid) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Calendar className="h-3 w-3" /> Start Date
                     </label>
-                    <span className="text-xs text-muted-foreground ml-2">
-                      Max 10MB
-                    </span>
+                    <Input type="date" value={editTaskStartDate} onChange={(e) => setEditTaskStartDate(e.target.value)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-sm" />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-3 w-3" /> End Date
+                    </label>
+                    <Input type="date" value={editTaskEndDate} onChange={(e) => setEditTaskEndDate(e.target.value)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-sm" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Allocation (Hrs/Min)</label>
+                  <div className="flex items-center gap-2">
+                    <Input type="number" placeholder="Hr" value={editTaskEstimateHours || ""} onChange={(e) => setEditTaskEstimateHours(Number(e.target.value) || 0)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-center" />
+                    <span className="text-xs font-bold opacity-30">H</span>
+                    <Input type="number" placeholder="Min" value={editTaskEstimateMinutes || ""} onChange={(e) => setEditTaskEstimateMinutes(Number(e.target.value) || 0)} className="h-10 bg-slate-50 dark:bg-slate-900 border-none rounded-lg text-center" />
+                    <span className="text-xs font-bold opacity-30">M</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* OPERATIONAL DATA */}
+              <div className="relative p-4 md:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                <div className="absolute left-0 top-6 bottom-6 w-1 bg-primary rounded-r-full" />
+                <div className="mb-4">
+                  <h4 className="text-[12px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400">Operational Data</h4>
+                  <p className="text-[10px] text-muted-foreground">Technical parameters and specific bucket fields.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-y-4">
+                  {editingTask?.bucketId && (
+                    <DynamicCustomFields
+                      bucketId={editingTask.bucketId}
+                      existingValues={editTaskCustomFields}
+                      onChange={setEditTaskCustomFields}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* DESCRIPTION & CHECKLIST */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4 opacity-50" /> Task Description
+                  </label>
+                  <Textarea
+                    placeholder="Enter detailed notes..."
+                    className="min-h-[120px] bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-800 resize-none rounded-xl text-sm focus-visible:ring-primary"
+                    value={editTaskDescription}
+                    onChange={(e) => setEditTaskDescription(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <ListChecks className="h-4 w-4 opacity-50" /> Checklist
+                  </label>
+                  <div className="space-y-2">
+                    {editTaskChecklist.map((item) => (
+                      <div key={item.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl group transition-all hover:bg-slate-100">
+                        <Checkbox checked={item.completed} onCheckedChange={() => handleToggleChecklistItem(item.id)} />
+                        <span className={`text-sm flex-1 ${item.completed ? "line-through text-muted-foreground" : "text-slate-700 dark:text-slate-200"}`}>{item.title}</span>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive hover:bg-destructive/10" onClick={() => handleRemoveChecklistItem(item.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-2 mt-2 bg-white dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 focus-within:ring-1 focus-within:ring-primary">
+                      <Plus className="h-4 w-4 text-primary" />
+                      <Input
+                        placeholder="Add item to checklist..."
+                        className="h-8 border-none bg-transparent shadow-none focus-visible:ring-0 text-sm p-0 w-full"
+                        value={newChecklistItem}
+                        onChange={(e) => setNewChecklistItem(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddChecklistItem()}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ATTACHMENTS */}
+              <div className="space-y-4 pb-6">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 opacity-50" /> Resources & Files
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {editTaskAttachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm group">
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg text-slate-500">
+                        {getFileIcon(att.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <button className="text-[11px] font-bold truncate text-left w-full hover:text-primary hover:underline" onClick={() => downloadAttachment(att.url, att.name)}>
+                          {att.name}
+                        </button>
+                        <p className="text-[9px] text-muted-foreground uppercase">{(att.size / 1024).toFixed(1)} KB</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => handleRemoveAttachment(att.id)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:border-primary/50 cursor-pointer transition-all group min-h-[80px]">
+                    <input type="file" className="hidden" onChange={handleEditFileUpload} disabled={isUploadingEdit} />
+                    <div className="flex items-center gap-2">
+                      <Upload className={`h-4 w-4 ${isUploadingEdit ? "animate-bounce" : "text-slate-400 group-hover:text-primary"}`} />
+                      <span className="text-xs font-bold text-slate-500 group-hover:text-slate-700">
+                        {isUploadingEdit ? "Uploading..." : "Add File"}
+                      </span>
+                    </div>
+                  </label>
                 </div>
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button
-              onClick={handleSaveEditTask}
-              disabled={updateTaskMutation.isPending}
-              data-testid="button-save-edit-task"
-            >
-              Save Changes
-            </Button>
+
+          {/* 3. FIXED FOOTER */}
+          <DialogFooter className="p-4 md:p-6 border-t bg-white dark:bg-slate-900 shrink-0">
+            <div className="flex w-full gap-3">
+              <DialogClose asChild>
+                <Button variant="ghost" className="flex-1 rounded-xl">Cancel</Button>
+              </DialogClose>
+              <Button
+                className="flex-[2] rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:brightness-110 transition-all"
+                onClick={handleSaveEditTask}
+                disabled={updateTaskMutation.isPending}
+              >
+                {updateTaskMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

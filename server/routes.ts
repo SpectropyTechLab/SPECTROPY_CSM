@@ -13,6 +13,7 @@ import {
 import { SupabaseStorageService } from "./services/supabaseStorage";
 
 import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
+import { parseCustomFields, serializeCustomFields, validateCustomFields } from "@shared/customFieldsUtils";
 import {
   createPermissionMiddleware,
   requireAdmin,
@@ -51,6 +52,21 @@ function getCurrentUserId(req: import("express").Request): number {
   return 2;
 }
 
+function getCustomFieldsForConfig(
+  customFieldsString: string | null,
+  config: { key: string }[] | null | undefined,
+): Record<string, string> {
+  const parsed = parseCustomFields(customFieldsString);
+  if (!config || config.length === 0) {
+    return parsed;
+  }
+
+  const allowedKeys = new Set(config.map((field) => field.key));
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => allowedKeys.has(key)),
+  );
+}
+
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
@@ -62,6 +78,7 @@ async function verifyPassword(
   return bcrypt.compare(password, hash);
 }
 //iintial dummy data for database  
+
 async function seedDatabase() {
   const users = await storage.getUsers();
   if (users.length === 0) {
@@ -103,18 +120,21 @@ async function seedDatabase() {
       title: "To Do",
       projectId: project.id,
       position: 0,
+      customFieldsConfig: [],
     });
 
     const bucket2 = await storage.createBucket({
       title: "In Progress",
       projectId: project.id,
       position: 1,
+      customFieldsConfig: [],
     });
 
     const bucket3 = await storage.createBucket({
       title: "Done",
       projectId: project.id,
       position: 2,
+      customFieldsConfig: [],
     });
 
     await storage.createTask({
@@ -341,6 +361,25 @@ export async function registerRoutes(
       }
 
       const input = api.tasks.create.input.parse(req.body);
+
+      // Custom Fields Validation
+      if (input.bucketId && input.customFields) {
+        const buckets = await storage.getBuckets(input.projectId);
+        const bucket = buckets.find(b => b.id === input.bucketId);
+
+        if (bucket?.customFieldsConfig) {
+          const parsedFields = parseCustomFields(input.customFields);
+          const validation = validateCustomFields(parsedFields, bucket.customFieldsConfig);
+
+          if (!validation.valid) {
+            return res.status(400).json({
+              message: "Custom field validation failed",
+              errors: validation.errors
+            });
+          }
+        }
+      }
+
       const task = await storage.createTask(input);
 
       if (task.assigneeId) {
@@ -375,15 +414,37 @@ export async function registerRoutes(
       throw err;
     }
   });
-
   app.patch(api.tasks.update.path, async (req, res) => {
     try {
       const currentUser = await storage.getUser(getCurrentUserId(req));
       const existingTask = await storage.getTask(Number(req.params.id));
       const input = api.tasks.update.input.parse(req.body);
 
+      // ====== ADD THIS SECTION - Custom Fields Validation ======
+      if (input.bucketId || input.customFields) {
+        const bucketId = input.bucketId || existingTask?.bucketId;
+
+        if (bucketId && input.customFields) {
+          const bucket = await storage.getBucket(bucketId);
+
+          if (bucket?.customFieldsConfig) {
+            const parsedFields = parseCustomFields(input.customFields);
+            const validation = validateCustomFields(parsedFields, bucket.customFieldsConfig);
+
+            if (!validation.valid) {
+              return res.status(400).json({
+                message: "Custom field validation failed",
+                errors: validation.errors
+              });
+            }
+          }
+        }
+      }
+      // ====== END CUSTOM FIELDS VALIDATION ======
+
       const isCompletion = input.status === "completed" && existingTask?.status !== "completed";
       const isUncompletion = input.status !== "completed" && existingTask?.status === "completed";
+
 
       if (!currentUser) {
         return res.status(401).json({ error: "User not found" });
@@ -1113,6 +1174,28 @@ export async function registerRoutes(
 
         if (currentBucketIndex >= 0 && currentBucketIndex < buckets.length - 1) {
           const nextBucket = buckets[currentBucketIndex + 1];
+          const currentBucket = buckets[currentBucketIndex];
+
+          const currentConfig = currentBucket?.customFieldsConfig || [];
+          const nextConfig = nextBucket.customFieldsConfig || [];
+          let mergedConfig = nextConfig;
+
+          if (currentConfig.length > 0) {
+            const nextKeys = new Set(nextConfig.map((field) => field.key));
+            const missing = currentConfig.filter((field) => !nextKeys.has(field.key));
+            if (missing.length > 0) {
+              mergedConfig = [...nextConfig, ...missing];
+              await storage.updateBucket(nextBucket.id, { customFieldsConfig: mergedConfig });
+            }
+          }
+
+          let customFields: string | undefined;
+          if (task.customFields) {
+            const filtered = getCustomFieldsForConfig(task.customFields, mergedConfig);
+            if (Object.keys(filtered).length > 0) {
+              customFields = serializeCustomFields(filtered);
+            }
+          }
 
           // Create new task in next bucket with empty dates
           const newTask = await storage.createTask({
@@ -1130,6 +1213,7 @@ export async function registerRoutes(
             history: [`Created from completed task on ${new Date().toLocaleDateString()}`],
             checklist: [],
             attachments: [],
+            customFields,
           });
 
           return res.json({ completedTask: task, newTask });

@@ -11,6 +11,7 @@ import {
   Calendar,
   RefreshCw,
   Layers,
+  ListTodo,
 } from "lucide-react";
 import type { Project, User } from "@shared/schema";
 
@@ -18,6 +19,7 @@ import ProjectReports from "@/components/reports/ProjectReports";
 import UserReports from "@/components/reports/UserReports";
 import DeadlineReports from "@/components/reports/DeadlineReports";
 import BucketReports from "@/components/reports/BucketReports";
+import TaskReport from "@/components/reports/taskreport";
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState("projects");
@@ -86,7 +88,7 @@ export default function Reports() {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsList className="grid w-full grid-cols-5 mb-6">
               <TabsTrigger value="projects" className="gap-2" data-testid="tab-projects">
                 <FolderKanban className="h-4 w-4" />
                 <span className="hidden sm:inline">Projects</span>
@@ -102,6 +104,10 @@ export default function Reports() {
               <TabsTrigger value="buckets" className="gap-2" data-testid="tab-buckets">
                 <Layers className="h-4 w-4" />
                 <span className="hidden sm:inline">Buckets</span>
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="gap-2" data-testid="tab-tasks">
+                <ListTodo className="h-4 w-4" />
+                <span className="hidden sm:inline">Tasks</span>
               </TabsTrigger>
             </TabsList>
 
@@ -173,6 +179,18 @@ export default function Reports() {
                     isAdmin={isAdmin}
                     currentUserId={currentUserId}
                   />
+                </motion.div>
+              </TabsContent>
+
+              <TabsContent key="tasks" value="tasks" className="mt-0">
+                <motion.div
+                  key="tasks"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TaskReport />
                 </motion.div>
               </TabsContent>
             </AnimatePresence>

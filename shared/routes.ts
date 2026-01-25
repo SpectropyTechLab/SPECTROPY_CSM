@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { insertProjectSchema, insertTaskSchema, insertUserSchema, insertBucketSchema, projects, tasks, users, buckets } from './schema';
+import { parseCustomFields, validateCustomFields } from "@shared/customFieldsUtils";
 
 export const errorSchemas = {
   validation: z.object({

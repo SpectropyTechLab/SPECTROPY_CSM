@@ -8,6 +8,8 @@ import cors from "cors";
 
 const app = express();
 const httpServer = createServer(app);
+console.log("TSX RELOAD CHECK", Date.now());
+
 
 declare module "http" {
   interface IncomingMessage {

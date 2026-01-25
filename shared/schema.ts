@@ -3,6 +3,19 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Custom Fields Schema - ADD THIS SECTION
+export const customFieldConfigSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  label: z.string(),
+  type: z.enum(["text", "number", "list", "checkbox"]),
+  required: z.boolean().default(false),
+  options: z.array(z.string()).optional(), // For list type
+  copyOnProgress: z.boolean().default(false), // For Phase 2B
+});
+
+export type CustomFieldConfig = z.infer<typeof customFieldConfigSchema>;
+
 export const checklistItemSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -77,6 +90,7 @@ export const buckets = pgTable("buckets", {
   title: text("title").notNull(),
   projectId: integer("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   position: integer("position").notNull().default(0),
+  customFieldsConfig: jsonb("custom_fields_config").$type<CustomFieldConfig[]>().default([]), // ADD THIS LINE
 });
 
 export const tasks = pgTable("tasks", {
@@ -98,6 +112,7 @@ export const tasks = pgTable("tasks", {
   dueDate: timestamp("due_date"),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  customFields: text("custom_fields"), // ADD THIS LINE
 });
 
 export const notifications = pgTable("notifications", {
@@ -159,7 +174,9 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true }).ext
   permissions: z.array(z.enum(PERMISSIONS)).optional().default([]),
 });
 export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
-export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true });
+export const insertBucketSchema = createInsertSchema(buckets).omit({ id: true }).extend({
+  customFieldsConfig: z.array(customFieldConfigSchema).optional().default([]),
+});
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true }).extend({
   startDate: z.union([z.coerce.date(), z.null()]).optional(),
   dueDate: z.union([z.coerce.date(), z.null()]).optional(),
@@ -167,6 +184,7 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, creat
   checklist: z.array(checklistItemSchema).optional().default([]),
   attachments: z.array(attachmentSchema).optional().default([]),
   history: z.array(historyItemSchema).optional().default([]),
+  customFields: z.string().optional(), // ADD THIS LINE
 });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });

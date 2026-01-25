@@ -112,7 +112,6 @@ export function requireAdmin() {
 
 function getCurrentUserId(req: Request): number | null {
   const userIdHeader = req.headers["x-user-id"];
-  console.log("\n ******************************************* ", userIdHeader, "\n*********************")
   if (userIdHeader) {
     const id = parseInt(userIdHeader as string, 10);
     return isNaN(id) ? null : id;
