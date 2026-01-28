@@ -108,14 +108,12 @@ export default function ProjectBoard() {
 
   const currentUserId = Number(localStorage.getItem("userId")) || null;
   const currentUserName = localStorage.getItem("userName") || "Unknown";
-
   const createHistoryEntry = (action: string): HistoryEntry => ({
     action,
     userId: currentUserId,
     userName: currentUserName,
     timestamp: new Date().toISOString(),
   });
-
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [isNewBucketOpen, setIsNewBucketOpen] = useState(false);
