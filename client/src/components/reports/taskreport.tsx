@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+ï»¿import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -41,6 +41,7 @@ import type {
   User,
 } from "@shared/schema";
 import { parseCustomFields } from "@shared/customFieldsUtils";
+import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
 
 type TaskReportProps = {
   selectedProjectId: string;
@@ -62,16 +63,8 @@ function getUserIdHeader(): Record<string, string> {
   return userId ? { "x-user-id": userId } : {};
 }
 
-function escapeCsvValue(value: unknown): string {
-  const stringValue = value === null || value === undefined ? "" : String(value);
-  if (/[",\n]/.test(stringValue)) {
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-  return stringValue;
-}
-
 function formatDate(value: string | Date | null | undefined): string {
-  if (!value) return "—";
+  if (!value) return "â€”";
   return new Date(value).toLocaleDateString();
 }
 
@@ -124,7 +117,22 @@ function formatCustomFieldValue(
   config: CustomFieldConfig,
 ): string {
   if (!value || value.trim() === "") {
-    return "—";
+    return "â€”";
+  }
+
+  if (config.type === "checkbox") {
+    return value === "true" ? "Yes" : "No";
+  }
+
+  return value;
+}
+
+function formatCustomFieldValueForExport(
+  value: string | undefined,
+  config: CustomFieldConfig,
+): string {
+  if (!value || value.trim() === "") {
+    return "";
   }
 
   if (config.type === "checkbox") {
@@ -260,7 +268,23 @@ export default function TaskReport({
       ids.add(id);
     }
 
-    if (ids.size === 0) return "—";
+    if (ids.size === 0) return "â€”";
+
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) {
+      ids.add(task.assigneeId);
+    }
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+
+    if (ids.size === 0) return "";
 
     return Array.from(ids)
       .map((id) => userById.get(id)?.name || `User ${id}`)
@@ -268,8 +292,13 @@ export default function TaskReport({
   };
 
   const getBucketTitle = (task: Task): string => {
-    if (!task.bucketId) return "—";
-    return bucketById.get(task.bucketId)?.title || "—";
+    if (!task.bucketId) return "â€”";
+    return bucketById.get(task.bucketId)?.title || "â€”";
+  };
+
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
   };
 
   const handleDownloadCsv = () => {
@@ -290,41 +319,32 @@ export default function TaskReport({
     const headers = [...baseHeaders, ...customHeaders];
 
     const rows = tasksWithParsedFields.map((task) => {
-      const estimateHours = ((task.estimateHours || 0) + (task.estimateMinutes || 0) / 60).toFixed(1);
+      const estimateHours = (
+        (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60
+      ).toFixed(1);
       const baseRow = [
         task.title,
         selectedProject.name,
-        getBucketTitle(task),
-        getAssigneeNames(task),
+        getBucketTitleForExport(task),
+        getAssigneeNamesForExport(task),
         getStatusLabel(task.status),
         getPriorityLabel(task.priority),
-        formatDate(task.startDate),
-        formatDate(task.dueDate),
+        formatDateForExport(task.startDate),
+        formatDateForExport(task.dueDate),
         estimateHours,
       ];
 
       const customFieldRow = customFieldConfigs.map((config) => {
         const value = task.parsedCustomFields[config.key];
-        return formatCustomFieldValue(value, config);
+        return formatCustomFieldValueForExport(value, config);
       });
 
       return [...baseRow, ...customFieldRow];
     });
 
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map(escapeCsvValue).join(","))
-      .join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
     const safeProjectName = selectedProject.name.toLowerCase().replace(/\s+/g, "-");
 
-    link.href = url;
-    link.download = `customer-report-${safeProjectName}.csv`;
-    link.click();
-
-    URL.revokeObjectURL(url);
+    downloadCsv(`customer-report-${safeProjectName}.csv`, headers, rows);
   };
 
   const isLoading = tasksLoading || bucketsLoading || usersLoading;
@@ -539,5 +559,6 @@ export default function TaskReport({
     </div>
   );
 }
+
 
 

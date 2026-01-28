@@ -115,6 +115,49 @@ export const tasks = pgTable("tasks", {
   customFields: text("custom_fields"), // ADD THIS LINE
 });
 
+type BucketSnapshot = typeof buckets.$inferSelect;
+
+export const deletedProjects = pgTable("deleted_projects", {
+  id: integer("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  ownerId: integer("owner_id"),
+  lastModifiedBy: integer("last_modified_by"),
+  buckets: jsonb("buckets").$type<BucketSnapshot[]>().default([]),
+  deletedAt: timestamp("deleted_at").defaultNow(),
+  deletedBy: integer("deleted_by"),
+  deletedByName: text("deleted_by_name"),
+});
+
+export const deletedTasks = pgTable("deleted_tasks", {
+  id: integer("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status"),
+  priority: text("priority"),
+  projectId: integer("project_id"),
+  bucketId: integer("bucket_id"),
+  assigneeId: integer("assignee_id"),
+  assignedUsers: integer("assigned_users").array(),
+  estimateHours: integer("estimate_hours"),
+  estimateMinutes: integer("estimate_minutes"),
+  history: jsonb("history").$type<HistoryItem[]>(),
+  checklist: jsonb("checklist").$type<ChecklistItem[]>(),
+  attachments: jsonb("attachments").$type<Attachment[]>(),
+  startDate: timestamp("start_date"),
+  dueDate: timestamp("due_date"),
+  position: integer("position"),
+  createdAt: timestamp("created_at"),
+  customFields: text("custom_fields"),
+  deletedByProject: boolean("deleted_by_project").default(false),
+  deletedAt: timestamp("deleted_at").defaultNow(),
+  deletedBy: integer("deleted_by"),
+  deletedByName: text("deleted_by_name"),
+});
+
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }),
@@ -186,6 +229,8 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, creat
   history: z.array(historyItemSchema).optional().default([]),
   customFields: z.string().optional(), // ADD THIS LINE
 });
+export const insertDeletedProjectSchema = createInsertSchema(deletedProjects).omit({ deletedAt: true });
+export const insertDeletedTaskSchema = createInsertSchema(deletedTasks).omit({ deletedAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 
@@ -202,6 +247,10 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type DeletedProject = typeof deletedProjects.$inferSelect;
+export type InsertDeletedProject = z.infer<typeof insertDeletedProjectSchema>;
+export type DeletedTask = typeof deletedTasks.$inferSelect;
+export type InsertDeletedTask = z.infer<typeof insertDeletedTaskSchema>;
 
 // API Types
 export type CreateProjectRequest = InsertProject;

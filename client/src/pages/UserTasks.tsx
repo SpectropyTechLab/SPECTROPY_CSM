@@ -56,6 +56,7 @@ export default function UserTasks() {
       return apiRequest("PATCH", `/api/tasks/${id}`, data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", { assigneeId: userId }] });
       toast({
         title: "Customer updated",

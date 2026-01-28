@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { User, Save, Camera } from "lucide-react";
+import { User, Save, Camera, Loader2 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { useUpload } from "@/hooks/use-upload";
 
 export default function Account() {
   const { toast } = useToast();
@@ -24,6 +25,9 @@ export default function Account() {
   const [email, setEmail] = useState("");
   const [title, setTitle] = useState("");
   const [avatar, setAvatar] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { uploadFile, isUploading } = useUpload();
 
   useEffect(() => {
     if (currentUser) {
@@ -59,6 +63,44 @@ export default function Account() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateMutation.mutate({ name, email, title, avatar });
+  };
+
+  const handleAvatarPick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const uploadResponse = await uploadFile(file);
+      if (!uploadResponse) {
+        throw new Error("Upload failed");
+      }
+
+      const downloadRes = await fetch(
+        `/api/uploads/download?path=${encodeURIComponent(uploadResponse.objectPath)}`,
+      );
+      if (!downloadRes.ok) {
+        throw new Error("Failed to get image URL");
+      }
+
+      const { downloadURL } = await downloadRes.json();
+      setAvatar(downloadURL);
+      toast({
+        title: "Photo uploaded",
+        description: "Your profile photo is ready to save.",
+      });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unable to upload photo",
+        variant: "destructive",
+      });
+    } finally {
+      e.target.value = "";
+    }
   };
 
   if (!currentUser) {
@@ -98,7 +140,7 @@ export default function Account() {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 space-y-2">
-                <Label htmlFor="avatar">Profile Picture URL</Label>
+                <Label htmlFor="avatar">Profile Picture</Label>
                 <div className="flex gap-2">
                   <Input
                     id="avatar"
@@ -107,10 +149,31 @@ export default function Account() {
                     onChange={(e) => setAvatar(e.target.value)}
                     data-testid="input-avatar"
                   />
-                  <Button type="button" size="icon" variant="outline">
-                    <Camera className="w-4 h-4" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={handleAvatarPick}
+                    disabled={isUploading}
+                    data-testid="button-upload-avatar"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload an image or paste a URL.
+                </p>
               </div>
             </div>
 

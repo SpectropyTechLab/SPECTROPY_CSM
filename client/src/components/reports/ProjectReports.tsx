@@ -14,6 +14,7 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -29,8 +30,10 @@ import {
   Clock,
   AlertTriangle,
   ListTodo,
+  Download,
 } from "lucide-react";
-import type { Project, Task } from "@shared/schema";
+import type { Project, Task, User } from "@shared/schema";
+import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
 
 const COLORS = [
   "#4f46e5",
@@ -58,10 +61,14 @@ export default function ProjectReports({
     queryKey: ["/api/tasks"],
   });
 
-  const { data: buckets = [] } = useQuery<
+  const { data: buckets = [], isLoading: bucketsLoading } = useQuery<
     { id: number; title: string; name: string; projectId: number }[]
   >({
     queryKey: ["/api/buckets"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const selectedProject = projects.find(
@@ -116,6 +123,75 @@ export default function ProjectReports({
     { status: "Completed", count: completedTasks },
   ];
 
+  const bucketById = new Map<number, { title: string }>();
+  buckets.forEach((bucket) => {
+    bucketById.set(bucket.id, { title: bucket.title });
+  });
+
+  const userById = new Map<number, User>();
+  users.forEach((user) => {
+    userById.set(user.id, user);
+  });
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) {
+      ids.add(task.assigneeId);
+    }
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+
+    if (ids.size === 0) return "";
+
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
+  };
+
+  const handleDownloadCsv = () => {
+    if (!selectedProject) return;
+
+    const headers = [
+      "Project",
+      "Customer",
+      "Stage",
+      "Assignees",
+      "Status",
+      "Priority",
+      "Start Date",
+      "Due Date",
+      "Estimate (hours)",
+    ];
+
+    const rows = projectTasks.map((task) => {
+      const estimateHours =
+        (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
+
+      return [
+        selectedProject.name,
+        task.title,
+        getBucketTitleForExport(task),
+        getAssigneeNamesForExport(task),
+        task.status || "",
+        task.priority || "",
+        formatDateForExport(task.startDate),
+        formatDateForExport(task.dueDate),
+        estimateHours ? estimateHours.toFixed(1) : "",
+      ];
+    });
+
+    const safeProjectName = selectedProject.name.toLowerCase().replace(/\s+/g, "-");
+    downloadCsv(`project-report-${safeProjectName}.csv`, headers, rows);
+  };
+
+  const isLoading = tasksLoading || bucketsLoading || usersLoading;
+
   if (!selectedProjectId || selectedProjectId === "") {
     return (
       <div className="space-y-6">
@@ -154,25 +230,35 @@ export default function ProjectReports({
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              Select Project
-            </label>
-            <Select value={selectedProjectId} onValueChange={onProjectChange}>
-              <SelectTrigger
-                className="w-full max-w-xs"
-                data-testid="select-project-report"
-              >
-                <SelectValue placeholder="Choose a project..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={String(project.id)}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Select Project
+              </label>
+              <Select value={selectedProjectId} onValueChange={onProjectChange}>
+                <SelectTrigger
+                  className="w-full max-w-xs"
+                  data-testid="select-project-report"
+                >
+                  <SelectValue placeholder="Choose a project..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={String(project.id)}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleDownloadCsv}
+              disabled={isLoading || projectTasks.length === 0}
+              data-testid="button-download-project-report"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Excel Download
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -58,6 +58,14 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    restore: {
+      method: 'POST' as const,
+      path: '/api/projects/:id/restore',
+      responses: {
+        200: z.custom<typeof projects.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
     clone: {
       method: 'POST' as const,
       path: '/api/projects/clone/:id',
@@ -105,6 +113,14 @@ export const api = {
       path: '/api/tasks/:id',
       responses: {
         204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+    restore: {
+      method: 'POST' as const,
+      path: '/api/tasks/:id/restore',
+      responses: {
+        200: z.custom<typeof tasks.$inferSelect>(),
         404: errorSchemas.notFound,
       },
     },

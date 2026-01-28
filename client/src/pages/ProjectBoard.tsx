@@ -224,6 +224,7 @@ export default function ProjectBoard() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
       setIsNewTaskOpen(false);
       resetNewTaskForm();
@@ -235,6 +236,7 @@ export default function ProjectBoard() {
       return apiRequest("PATCH", `/api/tasks/${id}`, data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
     },
   });
@@ -244,6 +246,7 @@ export default function ProjectBoard() {
       return apiRequest("DELETE", `/api/tasks/${id}`);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
     },
   });
@@ -276,6 +279,7 @@ export default function ProjectBoard() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/buckets", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", projectId] });
       toast({
         title: "Stage deleted",
@@ -2097,6 +2101,5 @@ export default function ProjectBoard() {
     </div>
   );
 }
-
 
 

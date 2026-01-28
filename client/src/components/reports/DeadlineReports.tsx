@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -23,9 +24,11 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
+  Download,
 } from "lucide-react";
-import type { Task } from "@shared/schema";
+import type { Task, Project, Bucket, User } from "@shared/schema";
 import { format, isWithinInterval, parseISO, differenceInDays } from "date-fns";
+import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
 
 const COLORS = ["#4f46e5", "#22d3ee", "#10b981", "#f59e0b", "#ef4444"];
 
@@ -47,6 +50,18 @@ export default function DeadlineReports({
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const { data: buckets = [], isLoading: bucketsLoading } = useQuery<Bucket[]>({
+    queryKey: ["/api/buckets"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const filteredTasks = tasks.filter((t) => {
@@ -114,11 +129,128 @@ export default function DeadlineReports({
     { status: "Pending", count: filteredTasks.filter((t) => t.status !== "completed" && (!t.dueDate || new Date(t.dueDate) >= new Date())).length },
   ];
 
+  const projectById = new Map<number, Project>();
+  projects.forEach((project) => {
+    projectById.set(project.id, project);
+  });
+
+  const bucketById = new Map<number, Bucket>();
+  buckets.forEach((bucket) => {
+    bucketById.set(bucket.id, bucket);
+  });
+
+  const userById = new Map<number, User>();
+  users.forEach((user) => {
+    userById.set(user.id, user);
+  });
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) {
+      ids.add(task.assigneeId);
+    }
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+
+    if (ids.size === 0) return "";
+
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getProjectNameForExport = (task: Task): string => {
+    if (!task.projectId) return "";
+    return projectById.get(task.projectId)?.name || "";
+  };
+
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
+  };
+
+  const handleDownloadCsv = () => {
+    const headers = [
+      "Customer",
+      "Project",
+      "Stage",
+      "Assignees",
+      "Status",
+      "Priority",
+      "Start Date",
+      "Due Date",
+    ];
+
+    const rows = filteredTasks.map((task) => [
+      task.title,
+      getProjectNameForExport(task),
+      getBucketTitleForExport(task),
+      getAssigneeNamesForExport(task),
+      task.status || "",
+      task.priority || "",
+      formatDateForExport(task.startDate),
+      formatDateForExport(task.dueDate),
+    ]);
+
+    const safeStart = startDate || "start";
+    const safeEnd = endDate || "end";
+    downloadCsv(`deadline-report-${safeStart}-to-${safeEnd}.csv`, headers, rows);
+  };
+
+  const isExportLoading = isLoading || projectsLoading || bucketsLoading || usersLoading;
+
   if (!startDate || !endDate) {
     return (
       <div className="space-y-6">
         <Card>
           <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4 items-end justify-between">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Start Date</label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-[180px]"
+                    data-testid="input-deadline-start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">End Date</label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-[180px]"
+                    data-testid="input-deadline-end"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleDownloadCsv}
+                disabled={isExportLoading || filteredTasks.length === 0}
+                data-testid="button-download-deadline-report"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Excel Download
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          Please select a date range to view deadline reports
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-end justify-between">
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Start Date</label>
@@ -141,40 +273,14 @@ export default function DeadlineReports({
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Please select a date range to view deadline reports
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Start Date</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-[180px]"
-                data-testid="input-deadline-start"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">End Date</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-[180px]"
-                data-testid="input-deadline-end"
-              />
-            </div>
+            <Button
+              onClick={handleDownloadCsv}
+              disabled={isExportLoading || filteredTasks.length === 0}
+              data-testid="button-download-deadline-report"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Excel Download
+            </Button>
           </div>
         </CardContent>
       </Card>

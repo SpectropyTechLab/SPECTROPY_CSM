@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,11 @@ import {
   User,
   Loader2,
   Clock,
+  RotateCcw,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { ActivityLog } from "@shared/schema";
 
@@ -31,6 +34,9 @@ export default function Logs() {
     queryKey: ["/api/logs"],
     refetchInterval: 5000,
   });
+  const { toast } = useToast();
+  const [restoringId, setRestoringId] = useState<number | null>(null);
+  const isAdmin = localStorage.getItem("userRole") === "Admin";
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -38,6 +44,8 @@ export default function Logs() {
         return <Plus className="h-4 w-4 text-emerald-500" />;
       case "deleted":
         return <Trash2 className="h-4 w-4 text-red-500" />;
+      case "restored":
+        return <RotateCcw className="h-4 w-4 text-blue-500" />;
       default:
         return <Clock className="h-4 w-4 text-slate-400" />;
     }
@@ -63,8 +71,40 @@ export default function Logs() {
         return "default";
       case "deleted":
         return "destructive";
+      case "restored":
+        return "secondary";
       default:
         return "secondary";
+    }
+  };
+
+  const handleUndo = async (log: ActivityLog) => {
+    if (!log.entityId) return;
+    if (log.entityType !== "project" && log.entityType !== "task") return;
+
+    setRestoringId(log.id);
+    try {
+      const path =
+        log.entityType === "project"
+          ? `/api/projects/${log.entityId}/restore`
+          : `/api/tasks/${log.entityId}/restore`;
+
+      await apiRequest("POST", path);
+      toast({
+        title: "Restored",
+        description: `${log.entityType} restored successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    } catch (err) {
+      toast({
+        title: "Restore failed",
+        description: err instanceof Error ? err.message : "Unable to restore item",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -132,6 +172,7 @@ export default function Logs() {
                       <TableHead className="w-[120px]">Entity Type</TableHead>
                       <TableHead>Entity Name</TableHead>
                       <TableHead className="w-[150px]">Performed By</TableHead>
+                      <TableHead className="w-[140px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -168,6 +209,26 @@ export default function Logs() {
                               {log.performedByName || "System"}
                             </span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          {isAdmin && log.action === "deleted" && log.entityId && (log.entityType === "project" || log.entityType === "task") ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-2"
+                              onClick={() => handleUndo(log)}
+                              disabled={restoringId === log.id}
+                            >
+                              {restoringId === log.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-4 w-4" />
+                              )}
+                              Undo
+                            </Button>
+                          ) : (
+                            <span className="text-slate-400 text-sm">-</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

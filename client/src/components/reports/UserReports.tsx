@@ -14,6 +14,7 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -30,8 +31,10 @@ import {
   TrendingUp,
   AlertTriangle,
   ListTodo,
+  Download,
 } from "lucide-react";
-import type { User as UserType, Task } from "@shared/schema";
+import type { User as UserType, Task, Project, Bucket } from "@shared/schema";
+import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
 
 const COLORS = ["#4f46e5", "#22d3ee", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -52,6 +55,14 @@ export default function UserReports({
 }: UserReportsProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
+  });
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const { data: buckets = [], isLoading: bucketsLoading } = useQuery<Bucket[]>({
+    queryKey: ["/api/buckets"],
   });
 
   const availableUsers = isAdmin ? users : users.filter((u) => u.id === currentUserId);
@@ -95,6 +106,88 @@ export default function UserReports({
     { priority: "Low", count: userTasks.filter((t) => t.priority === "low").length },
   ];
 
+  const projectById = new Map<number, Project>();
+  projects.forEach((project) => {
+    projectById.set(project.id, project);
+  });
+
+  const bucketById = new Map<number, Bucket>();
+  buckets.forEach((bucket) => {
+    bucketById.set(bucket.id, bucket);
+  });
+
+  const userById = new Map<number, UserType>();
+  users.forEach((user) => {
+    userById.set(user.id, user);
+  });
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) {
+      ids.add(task.assigneeId);
+    }
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+
+    if (ids.size === 0) return "";
+
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
+  };
+
+  const getProjectNameForExport = (task: Task): string => {
+    if (!task.projectId) return "";
+    return projectById.get(task.projectId)?.name || "";
+  };
+
+  const handleDownloadCsv = () => {
+    if (!selectedUserId) return;
+    const selectedUser = users.find((u) => String(u.id) === selectedUserId);
+
+    const headers = [
+      "User",
+      "Customer",
+      "Project",
+      "Stage",
+      "Assignees",
+      "Status",
+      "Priority",
+      "Start Date",
+      "Due Date",
+      "Estimate (hours)",
+    ];
+
+    const rows = userTasks.map((task) => {
+      const estimateHours =
+        (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
+
+      return [
+        selectedUser?.name || "",
+        task.title,
+        getProjectNameForExport(task),
+        getBucketTitleForExport(task),
+        getAssigneeNamesForExport(task),
+        task.status || "",
+        task.priority || "",
+        formatDateForExport(task.startDate),
+        formatDateForExport(task.dueDate),
+        estimateHours ? estimateHours.toFixed(1) : "",
+      ];
+    });
+
+    const safeUserName = (selectedUser?.name || "user").toLowerCase().replace(/\s+/g, "-");
+    downloadCsv(`user-report-${safeUserName}.csv`, headers, rows);
+  };
+
+  const isLoading = tasksLoading || projectsLoading || bucketsLoading;
+
   if (!selectedUserId || selectedUserId === "") {
     return (
       <div className="space-y-6">
@@ -130,20 +223,30 @@ export default function UserReports({
     <div className="space-y-6">
       <Card>
         <CardContent className="pt-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Select User</label>
-            <Select value={selectedUserId} onValueChange={onUserChange}>
-              <SelectTrigger className="w-full max-w-xs" data-testid="select-user-report">
-                <SelectValue placeholder="Choose a user..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableUsers.map((user) => (
-                  <SelectItem key={user.id} value={String(user.id)}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Select User</label>
+              <Select value={selectedUserId} onValueChange={onUserChange}>
+                <SelectTrigger className="w-full max-w-xs" data-testid="select-user-report">
+                  <SelectValue placeholder="Choose a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleDownloadCsv}
+              disabled={isLoading || userTasks.length === 0}
+              data-testid="button-download-user-report"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Excel Download
+            </Button>
           </div>
         </CardContent>
       </Card>

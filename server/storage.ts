@@ -1,6 +1,7 @@
 import { db } from "./db";
 import {
   users, projects, tasks, buckets, notifications, activityLogs,
+  deletedProjects, deletedTasks,
   type User, type InsertUser,
   type Project, type InsertProject,
   type Bucket, type InsertBucket,
@@ -11,7 +12,7 @@ import {
   type UpdateBucketRequest,
   type UpdateTaskRequest
 } from "@shared/schema";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -27,7 +28,16 @@ export interface IStorage {
   getProject(id: number): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: number, updates: UpdateProjectRequest): Promise<Project>;
-  deleteProject(id: number): Promise<void>;
+  deleteProject(id: number, deletedBy: number, deletedByName: string): Promise<{
+    project: Project;
+    tasks: Task[];
+    buckets: Bucket[];
+  }>;
+  restoreProject(id: number): Promise<{
+    project: Project;
+    tasks: Task[];
+    buckets: Bucket[];
+  }>;
   cloneProject(id: number, newName: string, ownerId: number): Promise<Project>;
 
   // Buckets
@@ -44,7 +54,8 @@ export interface IStorage {
   getTask(id: number): Promise<Task | undefined>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: number, updates: UpdateTaskRequest): Promise<Task>;
-  deleteTask(id: number): Promise<void>;
+  deleteTask(id: number, deletedBy: number, deletedByName: string, deletedByProject?: boolean): Promise<Task>;
+  restoreTask(id: number): Promise<Task>;
 
   // Notifications
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -106,10 +117,46 @@ export class DatabaseStorage implements IStorage {
     return project;
   }
 
-  async deleteProject(id: number): Promise<void> {
-    await db.delete(tasks).where(eq(tasks.projectId, id));
-    await db.delete(buckets).where(eq(buckets.projectId, id));
-    await db.delete(projects).where(eq(projects.id, id));
+  async deleteProject(id: number, deletedBy: number, deletedByName: string): Promise<{
+    project: Project;
+    tasks: Task[];
+    buckets: Bucket[];
+  }> {
+    return await db.transaction(async (tx) => {
+      const [project] = await tx.select().from(projects).where(eq(projects.id, id));
+      if (!project) {
+        throw new Error("Project not found");
+      }
+
+      const projectBuckets = await tx.select().from(buckets).where(eq(buckets.projectId, id)).orderBy(asc(buckets.position));
+      const projectTasks = await tx.select().from(tasks).where(eq(tasks.projectId, id)).orderBy(asc(tasks.position));
+
+      if (projectTasks.length > 0) {
+        await tx.insert(deletedTasks).values(
+          projectTasks.map((task) => ({
+            ...task,
+            deletedByProject: true,
+            deletedAt: new Date(),
+            deletedBy,
+            deletedByName,
+          })),
+        );
+      }
+
+      await tx.insert(deletedProjects).values({
+        ...project,
+        buckets: JSON.parse(JSON.stringify(projectBuckets)),
+        deletedAt: new Date(),
+        deletedBy,
+        deletedByName,
+      });
+
+      await tx.delete(tasks).where(eq(tasks.projectId, id));
+      await tx.delete(buckets).where(eq(buckets.projectId, id));
+      await tx.delete(projects).where(eq(projects.id, id));
+
+      return { project, tasks: projectTasks, buckets: projectBuckets };
+    });
   }
 
   async cloneProject(id: number, newName: string, ownerId: number): Promise<Project> {
@@ -196,8 +243,156 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
 
-  async deleteTask(id: number): Promise<void> {
-    await db.delete(tasks).where(eq(tasks.id, id));
+  async deleteTask(id: number, deletedBy: number, deletedByName: string, deletedByProject = false): Promise<Task> {
+    return await db.transaction(async (tx) => {
+      const [task] = await tx.select().from(tasks).where(eq(tasks.id, id));
+      if (!task) {
+        throw new Error("Task not found");
+      }
+
+      await tx.insert(deletedTasks).values({
+        ...task,
+        deletedByProject,
+        deletedAt: new Date(),
+        deletedBy,
+        deletedByName,
+      });
+
+      await tx.delete(tasks).where(eq(tasks.id, id));
+      return task;
+    });
+  }
+
+  async restoreProject(id: number): Promise<{
+    project: Project;
+    tasks: Task[];
+    buckets: Bucket[];
+  }> {
+    return await db.transaction(async (tx) => {
+      const [deletedProject] = await tx.select().from(deletedProjects).where(eq(deletedProjects.id, id));
+      if (!deletedProject) {
+        throw new Error("Deleted project not found");
+      }
+
+      const existingProject = await tx.select().from(projects).where(eq(projects.id, id));
+      if (existingProject.length > 0) {
+        throw new Error("Project already exists");
+      }
+
+      const [restoredProject] = await tx.insert(projects).values({
+        id: deletedProject.id,
+        name: deletedProject.name,
+        description: deletedProject.description,
+        status: deletedProject.status ?? "active",
+        startDate: deletedProject.startDate,
+        endDate: deletedProject.endDate,
+        ownerId: deletedProject.ownerId,
+        lastModifiedBy: deletedProject.lastModifiedBy,
+      }).returning();
+
+      const bucketSnapshots = Array.isArray(deletedProject.buckets) ? deletedProject.buckets : [];
+      let restoredBuckets: Bucket[] = [];
+      if (bucketSnapshots.length > 0) {
+        const bucketValues = bucketSnapshots.map((bucket) => ({
+          id: bucket.id,
+          title: bucket.title,
+          projectId: restoredProject.id,
+          position: bucket.position ?? 0,
+          customFieldsConfig: bucket.customFieldsConfig ?? [],
+        }));
+        restoredBuckets = await tx.insert(buckets).values(bucketValues).returning();
+      }
+
+      const deletedProjectTasks = await tx
+        .select()
+        .from(deletedTasks)
+        .where(eq(deletedTasks.projectId, restoredProject.id))
+        .orderBy(asc(deletedTasks.position));
+
+      const tasksToRestore = deletedProjectTasks.filter((task) => task.deletedByProject);
+      let restoredTasks: Task[] = [];
+      if (tasksToRestore.length > 0) {
+        const bucketIdSet = new Set(restoredBuckets.map((bucket) => bucket.id));
+        const taskValues = tasksToRestore.map((task) => {
+          const {
+            deletedAt: _deletedAt,
+            deletedBy: _deletedBy,
+            deletedByName: _deletedByName,
+            deletedByProject: _deletedByProject,
+            ...taskData
+          } = task;
+
+          const bucketId = taskData.bucketId && bucketIdSet.has(taskData.bucketId)
+            ? taskData.bucketId
+            : null;
+
+          return {
+            ...taskData,
+            bucketId,
+          };
+        });
+
+        restoredTasks = await tx.insert(tasks).values(taskValues).returning();
+        await tx.delete(deletedTasks).where(and(
+          eq(deletedTasks.projectId, restoredProject.id),
+          eq(deletedTasks.deletedByProject, true),
+        ));
+      } else {
+        await tx.delete(deletedTasks).where(and(
+          eq(deletedTasks.projectId, restoredProject.id),
+          eq(deletedTasks.deletedByProject, true),
+        ));
+      }
+
+      await tx.delete(deletedProjects).where(eq(deletedProjects.id, restoredProject.id));
+
+      return { project: restoredProject, tasks: restoredTasks, buckets: restoredBuckets };
+    });
+  }
+
+  async restoreTask(id: number): Promise<Task> {
+    return await db.transaction(async (tx) => {
+      const [deletedTask] = await tx.select().from(deletedTasks).where(eq(deletedTasks.id, id));
+      if (!deletedTask) {
+        throw new Error("Deleted task not found");
+      }
+
+      const existingTask = await tx.select().from(tasks).where(eq(tasks.id, id));
+      if (existingTask.length > 0) {
+        throw new Error("Task already exists");
+      }
+
+      if (deletedTask.projectId) {
+        const [project] = await tx.select().from(projects).where(eq(projects.id, deletedTask.projectId));
+        if (!project) {
+          throw new Error("Project not found for task restore");
+        }
+      }
+
+      let bucketId: number | null = deletedTask.bucketId ?? null;
+      if (bucketId) {
+        const [bucket] = await tx.select().from(buckets).where(eq(buckets.id, bucketId));
+        if (!bucket) {
+          bucketId = null;
+        }
+      }
+
+      const {
+        deletedAt: _deletedAt,
+        deletedBy: _deletedBy,
+        deletedByName: _deletedByName,
+        deletedByProject: _deletedByProject,
+        ...taskData
+      } = deletedTask;
+
+      const [restoredTask] = await tx.insert(tasks).values({
+        ...taskData,
+        bucketId,
+      }).returning();
+
+      await tx.delete(deletedTasks).where(eq(deletedTasks.id, id));
+      return restoredTask;
+    });
   }
 
   // Notifications

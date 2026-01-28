@@ -14,6 +14,7 @@ import {
   Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -22,8 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FolderKanban, ListTodo, Clock, AlertTriangle } from "lucide-react";
-import type { Project, Task } from "@shared/schema";
+import { FolderKanban, ListTodo, Clock, AlertTriangle, Download } from "lucide-react";
+import type { Project, Task, User } from "@shared/schema";
+import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
 
 const COLORS = [
   "#4f46e5",
@@ -67,6 +69,10 @@ export default function BucketReports({
 
   const { data: buckets = [], isLoading: bucketsLoading } = useQuery<Bucket[]>({
     queryKey: ["/api/buckets"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const filteredBuckets =
@@ -135,13 +141,143 @@ export default function BucketReports({
     },
   ];
 
-  const isLoading = tasksLoading || bucketsLoading;
+  const userById = new Map<number, User>();
+  users.forEach((user) => {
+    userById.set(user.id, user);
+  });
+
+  const projectById = new Map<number, Project>();
+  projects.forEach((project) => {
+    projectById.set(project.id, project);
+  });
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) {
+      ids.add(task.assigneeId);
+    }
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+
+    if (ids.size === 0) return "";
+
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getProjectNameForExport = (task: Task): string => {
+    if (!task.projectId) return "";
+    return projectById.get(task.projectId)?.name || "";
+  };
+
+  const handleDownloadCsv = () => {
+    if (!selectedBucket) return;
+
+    const headers = [
+      "Stage",
+      "Project",
+      "Customer",
+      "Assignees",
+      "Status",
+      "Priority",
+      "Start Date",
+      "Due Date",
+    ];
+
+    const rows = bucketTasks.map((task) => [
+      selectedBucket.title,
+      getProjectNameForExport(task),
+      task.title,
+      getAssigneeNamesForExport(task),
+      task.status || "",
+      task.priority || "",
+      formatDateForExport(task.startDate),
+      formatDateForExport(task.dueDate),
+    ]);
+
+    const safeBucketName = selectedBucket.title.toLowerCase().replace(/\s+/g, "-");
+    downloadCsv(`stage-report-${safeBucketName}.csv`, headers, rows);
+  };
+
+  const isLoading = tasksLoading || bucketsLoading || usersLoading;
 
   if (!selectedBucketId || selectedBucketId === "") {
     return (
       <div className="space-y-6">
         <Card>
           <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-4 items-end justify-between">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Filter by Project
+                  </label>
+                  <Select
+                    value={selectedProjectFilter}
+                    onValueChange={onProjectFilterChange}
+                  >
+                    <SelectTrigger
+                      className="w-[200px]"
+                      data-testid="select-bucket-project-filter"
+                    >
+                      <SelectValue placeholder="All Projects" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Projects</SelectItem>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={String(project.id)}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Select Stage
+                  </label>
+                  <Select value={selectedBucketId} onValueChange={onBucketChange}>
+                    <SelectTrigger
+                      className="w-[200px]"
+                      data-testid="select-bucket-report"
+                    >
+                      <SelectValue placeholder="Choose a stage..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredBuckets.map((bucket) => (
+                        <SelectItem key={bucket.id} value={String(bucket.id)}>
+                          {bucket.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                onClick={handleDownloadCsv}
+                disabled={isLoading || bucketTasks.length === 0}
+                data-testid="button-download-stage-report"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Excel Download
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          Please select a Stage to view reports
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-4 items-end justify-between">
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">
@@ -188,64 +324,14 @@ export default function BucketReports({
                 </Select>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          Please select a Stage to view reports
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Filter by Project
-              </label>
-              <Select
-                value={selectedProjectFilter}
-                onValueChange={onProjectFilterChange}
-              >
-                <SelectTrigger
-                  className="w-[200px]"
-                  data-testid="select-bucket-project-filter"
-                >
-                  <SelectValue placeholder="All Projects" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={String(project.id)}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Select Stage
-              </label>
-              <Select value={selectedBucketId} onValueChange={onBucketChange}>
-                <SelectTrigger
-                  className="w-[200px]"
-                  data-testid="select-bucket-report"
-                >
-                  <SelectValue placeholder="Choose a stage..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredBuckets.map((bucket) => (
-                    <SelectItem key={bucket.id} value={String(bucket.id)}>
-                      {bucket.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Button
+              onClick={handleDownloadCsv}
+              disabled={isLoading || bucketTasks.length === 0}
+              data-testid="button-download-stage-report"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Excel Download
+            </Button>
           </div>
         </CardContent>
       </Card>

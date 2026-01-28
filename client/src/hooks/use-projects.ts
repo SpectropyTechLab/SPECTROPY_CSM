@@ -98,6 +98,7 @@ export function useDeleteProject() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.projects.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.tasks.list.path] });
       toast({ title: "Deleted", description: "Project has been removed" });
     },
   });

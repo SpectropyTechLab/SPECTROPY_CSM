@@ -18,6 +18,14 @@ interface UseUploadOptions {
   onError?: (error: Error) => void;
 }
 
+function getUserIdHeader(): Record<string, string> {
+  if (typeof localStorage === "undefined") {
+    return {};
+  }
+  const userId = localStorage.getItem("userId");
+  return userId ? { "x-user-id": userId } : {};
+}
+
 /**
  * React hook for handling file uploads with presigned URLs.
  *
@@ -66,6 +74,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getUserIdHeader(),
         },
         body: JSON.stringify({
           name: file.name,
@@ -166,6 +175,7 @@ export function useUpload(options: UseUploadOptions = {}) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...getUserIdHeader(),
         },
         body: JSON.stringify({
           name: file.name,
@@ -196,4 +206,3 @@ export function useUpload(options: UseUploadOptions = {}) {
     progress,
   };
 }
-

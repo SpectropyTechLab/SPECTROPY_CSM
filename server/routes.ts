@@ -284,36 +284,72 @@ export async function registerRoutes(
       }
 
       const projectId = Number(req.params.id);
-      const project = await storage.getProject(projectId);
-      if (!project) {
-        return res.status(404).json({ message: "Project not found" });
-      }
-
-      const projectTasks = await storage.getTasks(projectId);
-      const projectBuckets = await storage.getBuckets(projectId);
+      const deletedProject = await storage.deleteProject(projectId, currentUser.id, currentUser.name);
 
       try {
         await storage.createActivityLog({
           entityType: "project",
-          entityId: projectId,
-          entityName: project.name,
+          entityId: deletedProject.project.id,
+          entityName: deletedProject.project.name,
           action: "deleted",
           performedBy: currentUser.id,
           performedByName: currentUser.name,
           payload: JSON.parse(JSON.stringify({
-            project,
-            tasks: projectTasks,
-            buckets: projectBuckets,
+            project: deletedProject.project,
+            tasks: deletedProject.tasks,
+            buckets: deletedProject.buckets,
           })),
         });
       } catch (logErr) {
         console.error("Failed to create activity log for project deletion:", logErr);
       }
 
-      await storage.updateProject(projectId, { status: "deleted" });
       res.status(204).send();
     } catch (err) {
+      if (err instanceof Error && err.message === "Project not found") {
+        return res.status(404).json({ message: "Project not found" });
+      }
       res.status(500).json({ message: "Failed to delete project" });
+    }
+  });
+
+  app.post(api.projects.restore.path, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || currentUser.role !== "Admin") {
+        return res.status(403).json({ error: "Permission denied", message: "Only admins can restore projects" });
+      }
+
+      const projectId = Number(req.params.id);
+      const restoredProject = await storage.restoreProject(projectId);
+
+      try {
+        await storage.createActivityLog({
+          entityType: "project",
+          entityId: restoredProject.project.id,
+          entityName: restoredProject.project.name,
+          action: "restored",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: JSON.parse(JSON.stringify({
+            project: restoredProject.project,
+            tasks: restoredProject.tasks,
+            buckets: restoredProject.buckets,
+          })),
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for project restore:", logErr);
+      }
+
+      res.json(restoredProject.project);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Deleted project not found") {
+        return res.status(404).json({ message: "Deleted project not found" });
+      }
+      if (err instanceof Error && err.message === "Project already exists") {
+        return res.status(409).json({ message: "Project already exists" });
+      }
+      res.status(500).json({ message: "Failed to restore project" });
     }
   });
 
@@ -564,10 +600,67 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Permission denied", message: "You do not have permission to delete tasks" });
       }
 
-      await storage.deleteTask(Number(req.params.id));
+      const deletedTask = await storage.deleteTask(Number(req.params.id), currentUser.id, currentUser.name);
+
+      try {
+        await storage.createActivityLog({
+          entityType: "task",
+          entityId: deletedTask.id,
+          entityName: deletedTask.title,
+          action: "deleted",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: JSON.parse(JSON.stringify({ task: deletedTask })),
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for task deletion:", logErr);
+      }
+
       res.status(204).send();
     } catch (err) {
+      if (err instanceof Error && err.message === "Task not found") {
+        return res.status(404).json({ message: "Task not found" });
+      }
       res.status(500).json({ message: "Failed to delete task" });
+    }
+  });
+
+  app.post(api.tasks.restore.path, async (req, res) => {
+    try {
+      const currentUser = await storage.getUser(getCurrentUserId(req));
+      if (!currentUser || currentUser.role !== "Admin") {
+        return res.status(403).json({ error: "Permission denied", message: "Only admins can restore tasks" });
+      }
+
+      const taskId = Number(req.params.id);
+      const restoredTask = await storage.restoreTask(taskId);
+
+      try {
+        await storage.createActivityLog({
+          entityType: "task",
+          entityId: restoredTask.id,
+          entityName: restoredTask.title,
+          action: "restored",
+          performedBy: currentUser.id,
+          performedByName: currentUser.name,
+          payload: JSON.parse(JSON.stringify({ task: restoredTask })),
+        });
+      } catch (logErr) {
+        console.error("Failed to create activity log for task restore:", logErr);
+      }
+
+      res.json(restoredTask);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Deleted task not found") {
+        return res.status(404).json({ message: "Deleted task not found" });
+      }
+      if (err instanceof Error && err.message === "Task already exists") {
+        return res.status(409).json({ message: "Task already exists" });
+      }
+      if (err instanceof Error && err.message === "Project not found for task restore") {
+        return res.status(409).json({ message: "Project not found for task restore" });
+      }
+      res.status(500).json({ message: "Failed to restore task" });
     }
   });
 
