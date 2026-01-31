@@ -219,7 +219,6 @@ export default function ProjectBoard() {
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      console.log("***********data*************", data);
       const res = await apiRequest("POST", "/api/tasks", data);
       return res.json();
     },

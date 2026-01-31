@@ -215,8 +215,8 @@ const Auth = () => {
             className="text-2xl font-bold text-center text-primary"
             data-testid="text-auth-title"
           >
-            {isLogin && "Login to Spectropy PMS"}
-            {isRegister && "Register for Spectropy PMS"}
+            {isLogin && "Login to Spectropy CSM"}
+            {isRegister && "Register for Spectropy CSM"}
             {isForgotPassword && "Reset Your Password"}
           </CardTitle>
           <CardDescription className="text-center text-slate-400">

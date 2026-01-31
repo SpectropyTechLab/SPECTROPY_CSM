@@ -164,6 +164,8 @@ export const notifications = pgTable("notifications", {
   userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   status: text("status").notNull().default("sent"),
+  message: text("message"),
+  seen: boolean("seen").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -231,7 +233,12 @@ export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, creat
 });
 export const insertDeletedProjectSchema = createInsertSchema(deletedProjects).omit({ deletedAt: true });
 export const insertDeletedTaskSchema = createInsertSchema(deletedTasks).omit({ deletedAt: true });
-export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export const insertNotificationSchema = createInsertSchema(notifications)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    message: z.string().optional(),
+    seen: z.boolean().optional().default(false),
+  });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 
 // Types

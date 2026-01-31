@@ -60,6 +60,9 @@ export interface IStorage {
   // Notifications
   createNotification(notification: InsertNotification): Promise<Notification>;
   getNotifications(userId: number): Promise<Notification[]>;
+  getOverdueNotifications(userId: number, onlyUnread?: boolean): Promise<Notification[]>;
+  getOverdueNotificationForTask(userId: number, taskId: number): Promise<Notification | undefined>;
+  markOverdueNotificationsSeen(userId: number): Promise<number>;
 
   // Activity Logs
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
@@ -403,6 +406,49 @@ export class DatabaseStorage implements IStorage {
 
   async getNotifications(userId: number): Promise<Notification[]> {
     return await db.select().from(notifications).where(eq(notifications.userId, userId));
+  }
+
+  async getOverdueNotifications(userId: number, onlyUnread = false): Promise<Notification[]> {
+    const conditions = [
+      eq(notifications.userId, userId),
+      eq(notifications.type, "TASK_OVERDUE"),
+    ];
+    if (onlyUnread) {
+      conditions.push(eq(notifications.seen, false));
+    }
+    return await db
+      .select()
+      .from(notifications)
+      .where(and(...conditions))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async getOverdueNotificationForTask(
+    userId: number,
+    taskId: number,
+  ): Promise<Notification | undefined> {
+    const [notification] = await db
+      .select()
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.taskId, taskId),
+        eq(notifications.type, "TASK_OVERDUE"),
+      ));
+    return notification;
+  }
+
+  async markOverdueNotificationsSeen(userId: number): Promise<number> {
+    const updated = await db
+      .update(notifications)
+      .set({ seen: true })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.type, "TASK_OVERDUE"),
+        eq(notifications.seen, false),
+      ))
+      .returning();
+    return updated.length;
   }
 
   // Activity Logs

@@ -10,7 +10,7 @@ export default function Welcome() {
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-accent/10 rounded-full blur-[100px] pointer-events-none" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
@@ -23,9 +23,9 @@ export default function Welcome() {
         </div>
 
         <h1 className="text-5xl md:text-7xl font-display font-bold text-white mb-6 tracking-tight">
-          Spectropy <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">PMS</span>
+          Spectropy <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">CSM</span>
         </h1>
-        
+
         <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
           The next generation project management system. Streamline your workflow, collaborate with your team, and ship faster.
         </p>
@@ -47,7 +47,7 @@ export default function Welcome() {
             "Real-time Collaboration",
             "Advanced Analytics"
           ].map((feature, i) => (
-            <motion.div 
+            <motion.div
               key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -62,7 +62,7 @@ export default function Welcome() {
           ))}
         </div>
       </motion.div>
-      
+
       <div className="absolute bottom-8 text-center text-sm text-muted-foreground opacity-60">
         © 2024 Spectropy Inc. All rights reserved.
       </div>

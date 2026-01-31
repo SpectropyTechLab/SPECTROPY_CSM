@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   ScrollText,
+  ListTodo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,7 +24,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { Notification } from "@shared/schema";
+
+type OverdueNotificationsResponse = {
+  count: number;
+  notifications: Notification[];
+};
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -35,9 +42,14 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const userRole = localStorage.getItem("userRole");
   const userName = localStorage.getItem("userName") || "User";
   const userAvatar = localStorage.getItem("userAvatar");
+  const { data: overdueNotifications } = useQuery<OverdueNotificationsResponse>({
+    queryKey: ["/api/notifications/overdue?unread=true"],
+  });
+  const overdueCount = overdueNotifications?.count ?? 0;
 
-  const adminNavItems = [
+  const adminNavItems: Array<{ label: string; href: string; icon: any; badgeCount?: number }> = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "My Todo", href: "/my-todo", icon: ListTodo, badgeCount: overdueCount },
     { label: "Projects", href: "/projects", icon: FolderKanban },
     { label: "Customers", href: "/tasks", icon: CheckSquare },
     { label: "Reports", href: "/reports", icon: BarChart3 },
@@ -45,8 +57,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
     { label: "Activity Logs", href: "/logs", icon: ScrollText },
   ];
 
-  const userNavItems = [
+  const userNavItems: Array<{ label: string; href: string; icon: any; badgeCount?: number }> = [
     { label: "Dashboard", href: "/user/dashboard", icon: LayoutDashboard },
+    { label: "My Todo", href: "/my-todo", icon: ListTodo, badgeCount: overdueCount },
     { label: "My Projects", href: "/user/projects", icon: FolderKanban },
     { label: "My Customers", href: "/user/tasks", icon: CheckSquare },
   ];
@@ -69,7 +82,8 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
 
   const sidebarContent = (
     <>
-      <div className="p-4 md:p-6 flex items-center gap-3">
+      {/*Sidebar header*/}
+      <div className="p-4 md:p-6 flex items-center gap-3 ">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden flex-shrink-0">
           <img
             src="/favicon.png"
@@ -78,6 +92,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           />
         </div>
 
+        {/*THE SIDEBAR HEADING*/}
         <div className="flex flex-col min-w-0 flex-1">
           <h1 className="font-display font-bold text-xl tracking-tight text-slate-900 truncate">
             Spectropy
@@ -91,7 +106,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden flex-shrink-0"
+            className="md:hidden flex-shrink-0 "
             onClick={onMobileClose}
             data-testid="button-close-sidebar"
           >
@@ -99,7 +114,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           </Button>
         )}
       </div>
-
+      {/*Navbar contains*/}
       <nav className="flex-1 px-3 md:px-4 py-4 md:py-6 space-y-1 md:space-y-2 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href || location.startsWith(item.href + "/");
@@ -123,12 +138,18 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                   )}
                 />
                 <span className="truncate">{item.label}</span>
+                {(item.badgeCount ?? 0) > 0 && (
+                  <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500 text-white animate-pulse">
+                    {item.badgeCount}
+                  </span>
+                )}
               </div>
             </Link>
           );
         })}
       </nav>
 
+      {/*footer account component*/}
       <div className="p-3 md:p-4 mt-auto border-t border-slate-100 bg-slate-50/50">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -218,7 +239,7 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
       >
         <Menu className="h-5 w-5" />
       </Button>
-      
+
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
           <img
@@ -234,4 +255,3 @@ export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
     </header>
   );
 }
-

@@ -12,8 +12,9 @@ import {
 } from "./emailService";
 import { SupabaseStorageService } from "./services/supabaseStorage";
 
-import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission } from "@shared/schema";
+import { checklistItemSchema, attachmentSchema, PERMISSIONS, type Permission, type Task } from "@shared/schema";
 import { parseCustomFields, serializeCustomFields, validateCustomFields } from "@shared/customFieldsUtils";
+import { toDateKey, isBeforeDateKey, isSameDateKey } from "@shared/dateUtils";
 import {
   createPermissionMiddleware,
   requireAdmin,
@@ -51,6 +52,60 @@ function getCurrentUserId(req: import("express").Request): number {
 
   return 2;
 }
+
+const getTodayKey = (): string => toDateKey(new Date());
+
+const isTaskAssignedToUser = (task: Task, userId: number): boolean => {
+  if (task.assigneeId === userId) {
+    return true;
+  }
+  const assignedUsers = task.assignedUsers ?? [];
+  return Array.isArray(assignedUsers) && assignedUsers.includes(userId);
+};
+
+const getTaskRecipientIds = (task: Task): number[] => {
+  const recipients = new Set<number>();
+  if (task.assigneeId) {
+    recipients.add(task.assigneeId);
+  }
+  const assignedUsers = task.assignedUsers ?? [];
+  if (Array.isArray(assignedUsers)) {
+    assignedUsers.forEach((id) => recipients.add(id));
+  }
+  return Array.from(recipients);
+};
+
+const isTaskOverdue = (task: Task, todayKey: string): boolean =>
+  task.status !== "completed" && isBeforeDateKey(task.dueDate, todayKey);
+
+const maybeCreateOverdueNotifications = async (
+  task: Task,
+  todayKey: string,
+): Promise<void> => {
+  if (!isTaskOverdue(task, todayKey)) {
+    return;
+  }
+
+  const recipientIds = getTaskRecipientIds(task);
+  if (recipientIds.length === 0) {
+    return;
+  }
+
+  for (const userId of recipientIds) {
+    const existing = await storage.getOverdueNotificationForTask(userId, task.id);
+    if (existing) {
+      continue;
+    }
+    await storage.createNotification({
+      taskId: task.id,
+      userId,
+      type: "TASK_OVERDUE",
+      status: "sent",
+      message: `Task ${task.title} is overdue`,
+      seen: false,
+    });
+  }
+};
 
 function getCustomFieldsForConfig(
   customFieldsString: string | null,
@@ -389,6 +444,22 @@ export async function registerRoutes(
     res.json(tasks);
   });
 
+  app.get("/api/tasks/my-todo", async (req, res) => {
+    const userId = getCurrentUserId(req);
+    const dateFilter =
+      typeof req.query.date === "string" ? req.query.date : undefined;
+
+    const allTasks = await storage.getTasks();
+    const myTasks = allTasks.filter(
+      (task) => task.status !== "completed" && isTaskAssignedToUser(task, userId),
+    );
+    const filteredTasks = dateFilter
+      ? myTasks.filter((task) => isSameDateKey(task.dueDate, dateFilter))
+      : myTasks;
+
+    res.json(filteredTasks);
+  });
+
   app.post(api.tasks.create.path, async (req, res) => {
     try {
       const currentUser = await storage.getUser(getCurrentUserId(req));
@@ -417,6 +488,8 @@ export async function registerRoutes(
       }
 
       const task = await storage.createTask(input);
+      // Create an in-app reminder if the task is already overdue on creation.
+      await maybeCreateOverdueNotifications(task, getTodayKey());
 
       if (task.assigneeId) {
         const assignee = await storage.getUser(task.assigneeId);
@@ -454,6 +527,8 @@ export async function registerRoutes(
     try {
       const currentUser = await storage.getUser(getCurrentUserId(req));
       const existingTask = await storage.getTask(Number(req.params.id));
+      const todayKey = getTodayKey();
+      const wasOverdue = existingTask ? isTaskOverdue(existingTask, todayKey) : false;
       const input = api.tasks.update.input.parse(req.body);
 
       // ====== ADD THIS SECTION - Custom Fields Validation ======
@@ -502,6 +577,11 @@ export async function registerRoutes(
       }
 
       const task = await storage.updateTask(Number(req.params.id), input);
+      const nowOverdue = isTaskOverdue(task, todayKey);
+      if (!wasOverdue && nowOverdue) {
+        // Trigger a reminder when a task crosses into overdue state.
+        await maybeCreateOverdueNotifications(task, todayKey);
+      }
       const project = await storage.getProject(task.projectId);
 
       if (project) {
@@ -762,6 +842,27 @@ export async function registerRoutes(
     if (!user) return res.status(404).json({ message: "User not found" });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
+  });
+
+  app.get("/api/notifications/overdue", async (req, res) => {
+    try {
+      const userId = getCurrentUserId(req);
+      const onlyUnread = req.query.unread === "true" || req.query.unread === "1";
+      const notifications = await storage.getOverdueNotifications(userId, onlyUnread);
+      res.json({ count: notifications.length, notifications });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch overdue notifications" });
+    }
+  });
+
+  app.patch("/api/notifications/overdue/seen", async (req, res) => {
+    try {
+      const userId = getCurrentUserId(req);
+      const updated = await storage.markOverdueNotificationsSeen(userId);
+      res.json({ updated });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to mark overdue notifications as seen" });
+    }
   });
 
   app.post("/api/auth/reset-password", async (req, res) => {

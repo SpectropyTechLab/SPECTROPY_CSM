@@ -5,6 +5,31 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
+
+type SelectSearchContextValue = {
+  query: string
+}
+
+const SelectSearchContext = React.createContext<SelectSearchContextValue | null>(
+  null
+)
+
+const getNodeText = (node: React.ReactNode): string => {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return ""
+  }
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node)
+  }
+  if (Array.isArray(node)) {
+    return node.map(getNodeText).join("")
+  }
+  if (React.isValidElement(node)) {
+    return getNodeText(node.props.children)
+  }
+  return ""
+}
 
 const Select = SelectPrimitive.Root
 
@@ -69,34 +94,89 @@ SelectScrollDownButton.displayName =
 
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
-    <SelectPrimitive.Content
-      ref={ref}
-      className={cn(
-        "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-select-content-transform-origin]",
-        position === "popper" &&
-          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
-        className
-      )}
-      position={position}
-      {...props}
-    >
-      <SelectScrollUpButton />
-      <SelectPrimitive.Viewport
-        className={cn(
-          "p-1",
-          position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
-        )}
-      >
-        {children}
-      </SelectPrimitive.Viewport>
-      <SelectScrollDownButton />
-    </SelectPrimitive.Content>
-  </SelectPrimitive.Portal>
-))
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    searchable?: boolean
+    searchPlaceholder?: string
+  }
+>(
+  (
+    {
+      className,
+      children,
+      position = "popper",
+      searchable = true,
+      searchPlaceholder = "Search...",
+      onOpenAutoFocus,
+      ...props
+    },
+    ref
+  ) => {
+    const [query, setQuery] = React.useState("")
+    const inputRef = React.useRef<HTMLInputElement | null>(null)
+    const normalizedQuery = query.trim().toLowerCase()
+
+    const handleOpenAutoFocus = React.useCallback(
+      (event: Event) => {
+        if (searchable) {
+          event.preventDefault()
+          window.requestAnimationFrame(() => {
+            inputRef.current?.focus()
+          })
+        }
+        onOpenAutoFocus?.(event)
+      },
+      [onOpenAutoFocus, searchable]
+    )
+
+    return (
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content
+          ref={ref}
+          className={cn(
+            "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-select-content-transform-origin]",
+            position === "popper" &&
+              "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+            className
+          )}
+          position={position}
+          onOpenAutoFocus={handleOpenAutoFocus}
+          {...props}
+        >
+          <SelectSearchContext.Provider value={{ query: normalizedQuery }}>
+            {searchable ? (
+              <div className="sticky top-0 z-10 border-b bg-popover p-2">
+                <Input
+                  ref={inputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="h-8 text-sm"
+                  onKeyDown={(event) => {
+                    event.stopPropagation()
+                  }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation()
+                  }}
+                />
+              </div>
+            ) : null}
+            <SelectScrollUpButton />
+            <SelectPrimitive.Viewport
+              className={cn(
+                "p-1",
+                position === "popper" &&
+                  "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+              )}
+            >
+              {children}
+            </SelectPrimitive.Viewport>
+            <SelectScrollDownButton />
+          </SelectSearchContext.Provider>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    )
+  }
+)
 SelectContent.displayName = SelectPrimitive.Content.displayName
 
 const SelectLabel = React.forwardRef<
@@ -113,25 +193,40 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
-    )}
-    {...props}
-  >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-      <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4" />
-      </SelectPrimitive.ItemIndicator>
-    </span>
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    searchValue?: string
+  }
+>(({ className, children, searchValue, textValue, ...props }, ref) => {
+  const searchContext = React.useContext(SelectSearchContext)
+  const resolvedText = searchValue ?? textValue ?? getNodeText(children)
+  const normalizedText = resolvedText.toLowerCase()
+  const shouldRender =
+    !searchContext?.query || normalizedText.includes(searchContext.query)
 
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-  </SelectPrimitive.Item>
-))
+  if (!shouldRender) {
+    return null
+  }
+
+  return (
+    <SelectPrimitive.Item
+      ref={ref}
+      className={cn(
+        "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      textValue={textValue ?? resolvedText}
+      {...props}
+    >
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <Check className="h-4 w-4" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  )
+})
 SelectItem.displayName = SelectPrimitive.Item.displayName
 
 const SelectSeparator = React.forwardRef<

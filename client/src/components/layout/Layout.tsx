@@ -9,7 +9,7 @@ export function Layout({ children }: LayoutProps) {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    document.title = "Spectropy PMS";
+    document.title = "Spectropy CSM";
   }, []);
 
   const handleOpenMobileSidebar = () => {
@@ -22,9 +22,9 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 font-sans">
-      <Sidebar 
-        isMobileOpen={isMobileSidebarOpen} 
-        onMobileClose={handleCloseMobileSidebar} 
+      <Sidebar
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={handleCloseMobileSidebar}
       />
       <MobileHeader onMenuClick={handleOpenMobileSidebar} />
       <main className="flex-1 pt-14 md:pt-0 p-4 md:p-6 md:pl-72 overflow-y-auto animate-in fade-in duration-500">
