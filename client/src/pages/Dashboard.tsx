@@ -56,16 +56,18 @@ const Dashboard = () => {
     task.status === "completed" && !!task.bucketId && lastBucketByProject.get(task.projectId)?.id === task.bucketId;
 
   const uniqueTaskCount = new Set(tasks.map(t => `${t.title}-${t.projectId}`)).size;
-  const completedCustomers = tasks.filter(isCompletedCustomer);
+  const completedCustomers = tasks.filter((task) => task.status === "completed");
   const todoTasks = tasks.filter((task) => task.status === "todo");
-  const inProgressTasks = tasks.filter((task) => task.status === "in_progress" || (task.status === "completed" && !isCompletedCustomer(task)));
+  const inProgressTasks = tasks.filter((task) => task.status === "in_progress");
   const efficiency = tasks.length > 0 ? Math.round((completedCustomers.length / tasks.length) * 100) : 0;
+  console.log("efficiency :", efficiency);
 
   const todayKey = toDateKey(new Date());
   const todaysTasks = tasks.filter((task) => toDateKey(task.startDate) === todayKey);
-  const pendingTasks = tasks.filter((task) => task.status === "todo" || task.status === "in_progress");
-  const dueTasks = tasks.filter((task) => task.status !== "completed" && task.dueDate && toDateKey(task.dueDate) <= todayKey);
-
+  const pendingTasks = tasks.filter((task) => (task.status === "todo" || task.status === "in_progress"));
+  const dueTasks = tasks.filter((task) => task.status !== "completed" && toDateKey(task.dueDate) < todayKey);
+  const compTasks = tasks.filter((task) => task.status === "completed");
+  console.log("Total task count: ", tasks.length, compTasks.length);
   const myOverdueTasks = myTodoTasks.filter((task) => isBeforeDateKey(task.dueDate, todayKey));
   const myTodayTasks = myTodoTasks.filter((task) => isSameDateKey(task.dueDate, todayKey));
   const myUpcomingTasks = myTodoTasks.filter((task) => isAfterDateKey(task.dueDate, todayKey));

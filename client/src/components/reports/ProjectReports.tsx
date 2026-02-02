@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -57,6 +58,9 @@ export default function ProjectReports({
   projects,
   isAdmin,
 }: ProjectReportsProps) {
+  // ----------------------------------------------------------------------
+  // 1. DATA FETCHING HOOKS
+  // ----------------------------------------------------------------------
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
   });
@@ -71,30 +75,115 @@ export default function ProjectReports({
     queryKey: ["/api/users"],
   });
 
+  // ----------------------------------------------------------------------
+  // 2. UI STATE HOOKS
+  // ----------------------------------------------------------------------
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+    key: 'title',
+    direction: null
+  });
+
+  // ----------------------------------------------------------------------
+  // 3. MEMOIZED LOOKUP MAPS (Must be before Helper Functions)
+  // ----------------------------------------------------------------------
+  const bucketById = useMemo(() => {
+    const map = new Map<number, { title: string }>();
+    buckets.forEach((bucket) => {
+      map.set(bucket.id, { title: bucket.title });
+    });
+    return map;
+  }, [buckets]);
+
+  const userById = useMemo(() => {
+    const map = new Map<number, User>();
+    users.forEach((user) => {
+      map.set(user.id, user);
+    });
+    return map;
+  }, [users]);
+
+  // ----------------------------------------------------------------------
+  // 4. HELPER FUNCTIONS (Must be before Data Processing)
+  // ----------------------------------------------------------------------
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
+  };
+
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) ids.add(task.assigneeId);
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+    if (ids.size === 0) return "";
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  // ----------------------------------------------------------------------
+  // 5. DATA PROCESSING (Filtering & Sorting)
+  // ----------------------------------------------------------------------
   const selectedProject = projects.find(
     (p) => String(p.id) === selectedProjectId,
   );
-  const projectTasks = tasks.filter(
-    (t) => String(t.projectId) === selectedProjectId,
-  );
-  const projectBuckets = buckets.filter(
-    (b) => Number(b.projectId) === Number(selectedProjectId),
-  );
 
+  const projectTasks = useMemo(() => {
+    return tasks.filter((t) => String(t.projectId) === selectedProjectId);
+  }, [tasks, selectedProjectId]);
+
+  const projectBuckets = useMemo(() => {
+    return buckets.filter((b) => Number(b.projectId) === Number(selectedProjectId));
+  }, [buckets, selectedProjectId]);
+
+  // Now safe to use helper functions here because they are defined above
+  const filteredTasks = useMemo(() => {
+    return projectTasks.filter(task =>
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getBucketTitleForExport(task).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [projectTasks, searchTerm, bucketById]); // Added bucketById dependency
+
+  const sortedTasks = useMemo(() => {
+    if (!sortConfig.direction) return filteredTasks;
+
+    return [...filteredTasks].sort((a, b) => {
+      let aVal: any = a[sortConfig.key as keyof Task] ?? '';
+      let bVal: any = b[sortConfig.key as keyof Task] ?? '';
+
+      if (sortConfig.key === 'stage') {
+        aVal = getBucketTitleForExport(a);
+        bVal = getBucketTitleForExport(b);
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredTasks, sortConfig, bucketById]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    else if (sortConfig.key === key && sortConfig.direction === 'desc') direction = null;
+    setSortConfig({ key, direction });
+  };
+
+  // ----------------------------------------------------------------------
+  // 6. STATISTICS CALCULATIONS
+  // ----------------------------------------------------------------------
   const totalTasks = projectTasks.length;
-  const completedTasks = projectTasks.filter(
-    (t) => t.status === "completed",
-  ).length;
-  const pendingTasks = projectTasks.filter(
-    (t) => t.status !== "completed",
-  ).length;
+  const completedTasks = projectTasks.filter((t) => t.status === "completed").length;
+  const pendingTasks = projectTasks.filter((t) => t.status !== "completed").length;
+
   const overdueTasks = projectTasks.filter((t) => {
     if (!t.dueDate || t.status === "completed") return false;
     return new Date(t.dueDate) < new Date();
   }).length;
 
-  const completionPercentage =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const estimatedMinutes = projectTasks.reduce((sum, t) => {
     return sum + (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
@@ -104,75 +193,26 @@ export default function ProjectReports({
   const bucketDistribution = projectBuckets
     .map((bucket) => ({
       name: bucket.title || "Unnamed",
-      count: projectTasks.filter(
-        (t) => Number(t.bucketId) === Number(bucket.id),
-      ).length,
+      count: projectTasks.filter((t) => Number(t.bucketId) === Number(bucket.id)).length,
     }))
     .filter((b) => b.count > 0);
 
-
   const statusData = [
-    {
-      status: "Not Started",
-      count: projectTasks.filter((t) => t.status === "todo").length,
-    },
-    {
-      status: "In Progress",
-      count: projectTasks.filter((t) => t.status === "in_progress").length,
-    },
+    { status: "Not Started", count: projectTasks.filter((t) => t.status === "todo").length },
+    { status: "In Progress", count: projectTasks.filter((t) => t.status === "in_progress").length },
     { status: "Completed", count: completedTasks },
   ];
-
-  const bucketById = new Map<number, { title: string }>();
-  buckets.forEach((bucket) => {
-    bucketById.set(bucket.id, { title: bucket.title });
-  });
-
-  const userById = new Map<number, User>();
-  users.forEach((user) => {
-    userById.set(user.id, user);
-  });
-
-  const getAssigneeNamesForExport = (task: Task): string => {
-    const ids = new Set<number>();
-    if (task.assigneeId) {
-      ids.add(task.assigneeId);
-    }
-    for (const id of task.assignedUsers || []) {
-      ids.add(id);
-    }
-
-    if (ids.size === 0) return "";
-
-    return Array.from(ids)
-      .map((id) => userById.get(id)?.name || `User ${id}`)
-      .join(", ");
-  };
-
-  const getBucketTitleForExport = (task: Task): string => {
-    if (!task.bucketId) return "";
-    return bucketById.get(task.bucketId)?.title || "";
-  };
 
   const handleDownloadCsv = () => {
     if (!selectedProject) return;
 
     const headers = [
-      "Project",
-      "Customer",
-      "Stage",
-      "Assignees",
-      "Status",
-      "Priority",
-      "Start Date",
-      "Due Date",
-      "Estimate (hours)",
+      "Project", "Customer", "Stage", "Assignees",
+      "Status", "Priority", "Start Date", "Due Date", "Estimate (hours)"
     ];
 
     const rows = projectTasks.map((task) => {
-      const estimateHours =
-        (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
-
+      const estimateHours = (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
       return [
         selectedProject.name,
         task.title,
@@ -192,20 +232,18 @@ export default function ProjectReports({
 
   const isLoading = tasksLoading || bucketsLoading || usersLoading;
 
+  // ----------------------------------------------------------------------
+  // 7. EARLY RETURNS
+  // ----------------------------------------------------------------------
   if (!selectedProjectId || selectedProjectId === "") {
     return (
       <div className="space-y-6">
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
-                Select Project
-              </label>
+              <label className="text-sm font-medium text-muted-foreground">Select Project</label>
               <Select value={selectedProjectId} onValueChange={onProjectChange}>
-                <SelectTrigger
-                  className="w-full max-w-xs"
-                  data-testid="select-project-report"
-                >
+                <SelectTrigger className="w-full max-w-xs" data-testid="select-project-report">
                   <SelectValue placeholder="Choose a project..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -226,6 +264,9 @@ export default function ProjectReports({
     );
   }
 
+  // ----------------------------------------------------------------------
+  // 8. FINAL RENDER
+  // ----------------------------------------------------------------------
   return (
     <div className="space-y-6">
       <Card>
@@ -263,7 +304,7 @@ export default function ProjectReports({
         </CardContent>
       </Card>
 
-      {tasksLoading ? (
+      {isLoading ? (
         <div className="grid gap-4 md:grid-cols-4">
           <Skeleton className="h-[120px]" />
           <Skeleton className="h-[120px]" />
@@ -443,10 +484,78 @@ export default function ProjectReports({
               </Card>
             </motion.div>
           </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6"
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-lg font-medium">Detailed Report</CardTitle>
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    placeholder="Search customers or stages..."
+                    className="w-full px-3 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="overflow-x-auto max-h-[400px]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                        <tr className="text-left font-medium text-muted-foreground">
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('title')}>
+                            Customer {sortConfig.key === 'title' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('stage')}>
+                            Stage {sortConfig.key === 'stage' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3">Assignees</th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('status')}>
+                            Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 text-right">Estimate (h)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {sortedTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                              No matching results found.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedTasks.map((task) => (
+                            <tr key={task.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-medium">{task.title}</td>
+                              <td className="p-3">{getBucketTitleForExport(task)}</td>
+                              <td className="p-3 text-xs text-muted-foreground">{getAssigneeNamesForExport(task)}</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${task.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-orange-50 text-orange-700 border-orange-200'
+                                  }`}>
+                                  {task.status?.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                {((task.estimateHours || 0) + (task.estimateMinutes || 0) / 60).toFixed(1)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </>
       )}
     </div>
   );
 }
-
-

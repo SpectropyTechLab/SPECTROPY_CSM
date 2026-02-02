@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Calendar, CheckCircle2, Clock, AlertCircle } from "lucide-react"; // Professional icons
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils"; // Shadcn utility for merging classes
 
 type TodoItem = {
   id: number;
@@ -20,32 +22,27 @@ type TodoOverviewCardProps = {
   dueTasks: TodoItem[];
   statusLabel: (status: string) => string;
   tone?: Tone;
-  maxItems?: {
-    today?: number;
-    pending?: number;
-    due?: number;
-  };
+  maxItems?: { today?: number; pending?: number; due?: number };
   emptyTodayText?: string;
   emptyPendingText?: string;
   emptyDueText?: string;
 };
 
-const toneClasses: Record<Tone, { card: string; item: string; empty: string }> =
-{
+const toneClasses: Record<Tone, { card: string; item: string; empty: string }> = {
   admin: {
-    card: "bg-white border-slate-200",
-    item: "border border-slate-100 bg-slate-50",
-    empty: "text-slate-400",
+    card: "bg-white border-slate-200 shadow-sm",
+    item: "border-slate-100 bg-slate-50/50 hover:bg-slate-100/80",
+    empty: "text-slate-400 bg-slate-50/30",
   },
   user: {
-    card: "",
-    item: "border border-slate-200 bg-slate-50",
-    empty: "text-muted-foreground",
+    card: "shadow-none border-slate-200",
+    item: "border-slate-200 bg-white hover:border-primary/20 hover:bg-slate-50",
+    empty: "text-muted-foreground bg-muted/20",
   },
 };
 
 const formatDueDate = (value?: string | Date | null) =>
-  value ? new Date(value).toLocaleDateString() : "—";
+  value ? new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
 
 export default function TodoOverviewCard({
   title,
@@ -62,109 +59,109 @@ export default function TodoOverviewCard({
   emptyDueText = "No due tasks.",
 }: TodoOverviewCardProps) {
   const classes = toneClasses[tone];
-  const todayLimit = maxItems?.today ?? 5;
-  const pendingLimit = maxItems?.pending ?? 5;
-  const dueLimit = maxItems?.due ?? 5;
+
+  const sections = [
+    {
+      label: "Today's Tasks",
+      data: todaysTasks,
+      limit: maxItems?.today ?? 5,
+      empty: emptyTodayText,
+      icon: <Calendar className="w-4 h-4 text-blue-500" />
+    },
+    {
+      label: "Pending Tasks",
+      data: pendingTasks,
+      limit: maxItems?.pending ?? 5,
+      empty: emptyPendingText,
+      icon: <Clock className="w-4 h-4 text-amber-500" />
+    },
+    {
+      label: "Due Tasks",
+      data: dueTasks,
+      limit: maxItems?.due ?? 5,
+      empty: emptyDueText,
+      icon: <AlertCircle className="w-4 h-4 text-rose-500" />
+    },
+  ];
 
   return (
-    <Card className={classes.card}>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div className="space-y-1">
-          <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-900">
-            {title}
-          </CardTitle>
-          <p className="text-sm text-slate-500">{subtitle}</p>
-        </div>
-        <div className="text-right">
-          <span className="text-2xl font-bold text-slate-900">{pendingCount}</span>
-          <p className="text-xs text-slate-500">Pending Total</p>
+    <Card className={cn("overflow-hidden transition-all", classes.card)}>
+      {/* Header Section */}
+      <CardHeader className="border-b border-slate-50 bg-slate-50/30 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              {title}
+            </CardTitle>
+            <p className="text-sm text-slate-500 font-medium">{subtitle}</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm self-start sm:self-center">
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 leading-none">Total Pending</p>
+              <span className="text-2xl font-black text-slate-900">{pendingCount}</span>
+            </div>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">
-                Today&apos;s Tasks
-              </p>
-              <Badge variant="secondary">{todaysTasks.length}</Badge>
-            </div>
-            <div className="space-y-2">
-              {todaysTasks.slice(0, todayLimit).map((task) => (
-                <div
-                  key={task.id}
-                  className={`flex items-center justify-between gap-2 p-2 rounded-lg ${classes.item}`}
-                >
-                  <span className="text-sm text-slate-700 truncate">
-                    {task.title}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {statusLabel(task.status)}
-                  </span>
-                </div>
-              ))}
-              {todaysTasks.length === 0 && (
-                <p className={`text-xs ${classes.empty}`}>{emptyTodayText}</p>
-              )}
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">
-                Pending Tasks
-              </p>
-              <Badge variant="secondary">{pendingTasks.length}</Badge>
-            </div>
-            <div className="space-y-2">
-              {pendingTasks.slice(0, pendingLimit).map((task) => (
-                <div
-                  key={task.id}
-                  className={`flex items-center justify-between gap-2 p-2 rounded-lg ${classes.item}`}
-                >
-                  <span className="text-sm text-slate-700 truncate">
-                    {task.title}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {statusLabel(task.status)}
-                  </span>
+      <CardContent className="p-0 sm:p-6">
+        {/* Responsive Grid: 1 column on mobile, 3 on desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+          {sections.map((section, idx) => (
+            <div key={idx} className="p-4 sm:p-0 md:px-4 first:pl-0 last:pr-0 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  {section.icon}
+                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-tight">
+                    {section.label}
+                  </h3>
                 </div>
-              ))}
-              {pendingTasks.length === 0 && (
-                <p className={`text-xs ${classes.empty}`}>{emptyPendingText}</p>
-              )}
-            </div>
-          </div>
+                <Badge variant="outline" className="font-mono font-bold bg-white">
+                  {section.data.length}
+                </Badge>
+              </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-700">Due Tasks</p>
-              <Badge variant="secondary">{dueTasks.length}</Badge>
-            </div>
-            <div className="space-y-2">
-              {dueTasks.slice(0, dueLimit).map((task) => (
-                <div
-                  key={task.id}
-                  className={`flex items-center justify-between gap-2 p-2 rounded-lg ${classes.item}`}
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm text-slate-700 truncate">
-                      {task.title}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Due {formatDueDate(task.dueDate)}
-                    </p>
+              <div className="space-y-2">
+                {section.data.slice(0, section.limit).map((task) => (
+                  <div
+                    key={task.id}
+                    className={cn(
+                      "group flex flex-col gap-1 p-3 rounded-xl border transition-all cursor-default",
+                      classes.item
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-sm font-semibold text-slate-800 leading-tight group-hover:text-primary transition-colors">
+                        {task.title}
+                      </span>
+                      <Badge className="text-[10px] h-5 px-1.5 shrink-0 bg-slate-200/50 text-slate-600 hover:bg-slate-200" variant="secondary">
+                        {statusLabel(task.status)}
+                      </Badge>
+                    </div>
+                    {task.dueDate && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                        <Calendar className="w-3 h-3" />
+                        Due {formatDueDate(task.dueDate)}
+                      </div>
+                    )}
                   </div>
-                  <span className="text-xs text-slate-500">
-                    {statusLabel(task.status)}
-                  </span>
-                </div>
-              ))}
-              {dueTasks.length === 0 && (
-                <p className={`text-xs ${classes.empty}`}>{emptyDueText}</p>
-              )}
+                ))}
+
+                {section.data.length === 0 && (
+                  <div className={cn("flex flex-col items-center justify-center py-8 rounded-xl border border-dashed", classes.empty)}>
+                    <p className="text-xs font-medium italic">{section.empty}</p>
+                  </div>
+                )}
+
+                {section.data.length > section.limit && (
+                  <p className="text-[11px] text-center text-slate-400 font-medium pt-1">
+                    + {section.data.length - section.limit} more tasks
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </CardContent>
     </Card>

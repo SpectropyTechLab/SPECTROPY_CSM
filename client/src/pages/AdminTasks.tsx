@@ -297,7 +297,7 @@ export default function AdminTasks() {
       </div>
 
       {/* Main Content Card */}
-      <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <Card className="border-slate-200 shadow-sm overflow-hidden ">
         {/* Toolbar */}
         <div className="p-5 border-b border-slate-100 bg-white flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
 

@@ -513,43 +513,6 @@ export default function ProjectBoard() {
     );
   };
 
-  const ensureNextBucketCustomFields = async (
-    task: Task,
-    nextBucket: Bucket,
-  ): Promise<string | undefined> => {
-    const currentBucket = buckets.find((b) => b.id === task.bucketId);
-    const currentConfig = currentBucket?.customFieldsConfig || [];
-    const nextConfig = nextBucket.customFieldsConfig || [];
-    let mergedConfig = nextConfig;
-
-    if (currentConfig.length > 0) {
-      const nextKeys = new Set(nextConfig.map((field) => field.key));
-      const missing = currentConfig.filter((field) => !nextKeys.has(field.key));
-      if (missing.length > 0) {
-        mergedConfig = [...nextConfig, ...missing];
-        try {
-          await updateBucketMutation.mutateAsync({
-            id: nextBucket.id,
-            customFieldsConfig: mergedConfig,
-          });
-        } catch (error) {
-          toast({
-            title: "Custom fields update failed",
-            description:
-              "Could not sync custom fields to the next stage. Customer will still be created.",
-            variant: "destructive",
-          });
-        }
-      }
-    }
-
-    if (!task.customFields) return undefined;
-    const filtered = getCustomFieldsForConfig(task.customFields, mergedConfig);
-    return Object.keys(filtered).length > 0
-      ? serializeCustomFields(filtered)
-      : undefined;
-  };
-
   const handleOpenEditTask = (task: Task) => {
     if (!canUpdateTask && !canCompleteTask) {
       toast({
@@ -748,39 +711,6 @@ export default function ProjectBoard() {
       ],
     });
 
-    if (newStatus === "completed" && buckets) {
-      const currentBucketIndex = buckets.findIndex(
-        (b) => b.id === task.bucketId,
-      );
-      const nextBucket = buckets[currentBucketIndex + 1];
-
-      if (nextBucket) {
-        const customFields = await ensureNextBucketCustomFields(task, nextBucket);
-        const newTaskData = {
-          title: task.title,
-          description: task.description || "",
-          priority: task.priority,
-          projectId: task.projectId,
-          bucketId: nextBucket.id,
-          assigneeId: task.assigneeId,
-          assignedUsers: task.assignedUsers || [],
-          startDate: task.startDate,
-          dueDate: task.dueDate,
-          estimateHours: task.estimateHours || 0,
-          estimateMinutes: task.estimateMinutes || 0,
-          checklist: [],
-          attachments: [],
-          customFields,
-          history: [
-            createHistoryEntry(
-              `Auto-created from completed customer in ${buckets[currentBucketIndex]?.title || "previous stage"}`,
-            ),
-          ],
-        };
-
-        createTaskMutation.mutate(newTaskData);
-      }
-    }
   };
 
   const getStatusLabel = (status: string) => {
@@ -838,39 +768,6 @@ export default function ProjectBoard() {
       ],
     });
 
-    if (completed && buckets) {
-      const currentBucketIndex = buckets.findIndex(
-        (b) => b.id === task.bucketId,
-      );
-      const nextBucket = buckets[currentBucketIndex + 1];
-
-      if (nextBucket) {
-        const customFields = await ensureNextBucketCustomFields(task, nextBucket);
-        const newTaskData = {
-          title: task.title,
-          description: task.description || "",
-          priority: task.priority,
-          projectId: task.projectId,
-          bucketId: nextBucket.id,
-          assigneeId: task.assigneeId,
-          assignedUsers: task.assignedUsers || [],
-          startDate: task.startDate,
-          dueDate: task.dueDate,
-          estimateHours: task.estimateHours || 0,
-          estimateMinutes: task.estimateMinutes || 0,
-          checklist: [],
-          attachments: [],
-          customFields,
-          history: [
-            createHistoryEntry(
-              `Auto-created from completed customer in ${buckets[currentBucketIndex]?.title || "previous stage"}`,
-            ),
-          ],
-        };
-
-        createTaskMutation.mutate(newTaskData);
-      }
-    }
   };
 
   const handleAddNewChecklistItem = () => {

@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -25,7 +26,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import {
-  User,
   CheckCircle2,
   Clock,
   TrendingUp,
@@ -53,6 +53,9 @@ export default function UserReports({
   isAdmin,
   currentUserId,
 }: UserReportsProps) {
+  // ----------------------------------------------------------------------
+  // 1. DATA HOOKS
+  // ----------------------------------------------------------------------
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
   });
@@ -65,13 +68,114 @@ export default function UserReports({
     queryKey: ["/api/buckets"],
   });
 
-  const availableUsers = isAdmin ? users : users.filter((u) => u.id === currentUserId);
-
-  const userTasks = tasks.filter((t) => {
-    const assignedUsers = t.assignedUsers || [];
-    return assignedUsers.includes(Number(selectedUserId)) || t.assigneeId === Number(selectedUserId);
+  // ----------------------------------------------------------------------
+  // 2. UI STATE
+  // ----------------------------------------------------------------------
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+    key: 'title',
+    direction: null
   });
 
+  // ----------------------------------------------------------------------
+  // 3. MEMOIZED LOOKUPS
+  // ----------------------------------------------------------------------
+  const projectById = useMemo(() => {
+    const map = new Map<number, Project>();
+    projects.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [projects]);
+
+  const bucketById = useMemo(() => {
+    const map = new Map<number, Bucket>();
+    buckets.forEach((b) => map.set(b.id, b));
+    return map;
+  }, [buckets]);
+
+  const userById = useMemo(() => {
+    const map = new Map<number, UserType>();
+    users.forEach((u) => map.set(u.id, u));
+    return map;
+  }, [users]);
+
+  // ----------------------------------------------------------------------
+  // 4. HELPER FUNCTIONS
+  // ----------------------------------------------------------------------
+  const getAssigneeNamesForExport = (task: Task): string => {
+    const ids = new Set<number>();
+    if (task.assigneeId) ids.add(task.assigneeId);
+    for (const id of task.assignedUsers || []) {
+      ids.add(id);
+    }
+    if (ids.size === 0) return "";
+    return Array.from(ids)
+      .map((id) => userById.get(id)?.name || `User ${id}`)
+      .join(", ");
+  };
+
+  const getBucketTitleForExport = (task: Task): string => {
+    if (!task.bucketId) return "";
+    return bucketById.get(task.bucketId)?.title || "";
+  };
+
+  const getProjectNameForExport = (task: Task): string => {
+    if (!task.projectId) return "";
+    return projectById.get(task.projectId)?.name || "";
+  };
+
+  // ----------------------------------------------------------------------
+  // 5. DATA PROCESSING (Filtering & Sorting)
+  // ----------------------------------------------------------------------
+  const availableUsers = isAdmin ? users : users.filter((u) => u.id === currentUserId);
+  const selectedUser = users.find((u) => String(u.id) === selectedUserId);
+
+  const userTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const assignedUsers = t.assignedUsers || [];
+      return assignedUsers.includes(Number(selectedUserId)) || t.assigneeId === Number(selectedUserId);
+    });
+  }, [tasks, selectedUserId]);
+
+  const filteredTasks = useMemo(() => {
+    return userTasks.filter(task =>
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getProjectNameForExport(task).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getBucketTitleForExport(task).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [userTasks, searchTerm, projectById, bucketById]);
+
+  const sortedTasks = useMemo(() => {
+    if (!sortConfig.direction) return filteredTasks;
+
+    return [...filteredTasks].sort((a, b) => {
+      let aVal: any = a[sortConfig.key as keyof Task] ?? '';
+      let bVal: any = b[sortConfig.key as keyof Task] ?? '';
+
+      // Handle derived string sorting
+      if (sortConfig.key === 'project') {
+        aVal = getProjectNameForExport(a);
+        bVal = getProjectNameForExport(b);
+      } else if (sortConfig.key === 'stage') {
+        aVal = getBucketTitleForExport(a);
+        bVal = getBucketTitleForExport(b);
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredTasks, sortConfig, projectById, bucketById]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    else if (sortConfig.key === key && sortConfig.direction === 'desc') direction = null;
+    setSortConfig({ key, direction });
+  };
+
+  // ----------------------------------------------------------------------
+  // 6. STATISTICS
+  // ----------------------------------------------------------------------
   const totalAssigned = userTasks.length;
   const completedTasks = userTasks.filter((t) => t.status === "completed").length;
   const pendingTasks = userTasks.filter((t) => t.status !== "completed").length;
@@ -106,68 +210,16 @@ export default function UserReports({
     { priority: "Low", count: userTasks.filter((t) => t.priority === "low").length },
   ];
 
-  const projectById = new Map<number, Project>();
-  projects.forEach((project) => {
-    projectById.set(project.id, project);
-  });
-
-  const bucketById = new Map<number, Bucket>();
-  buckets.forEach((bucket) => {
-    bucketById.set(bucket.id, bucket);
-  });
-
-  const userById = new Map<number, UserType>();
-  users.forEach((user) => {
-    userById.set(user.id, user);
-  });
-
-  const getAssigneeNamesForExport = (task: Task): string => {
-    const ids = new Set<number>();
-    if (task.assigneeId) {
-      ids.add(task.assigneeId);
-    }
-    for (const id of task.assignedUsers || []) {
-      ids.add(id);
-    }
-
-    if (ids.size === 0) return "";
-
-    return Array.from(ids)
-      .map((id) => userById.get(id)?.name || `User ${id}`)
-      .join(", ");
-  };
-
-  const getBucketTitleForExport = (task: Task): string => {
-    if (!task.bucketId) return "";
-    return bucketById.get(task.bucketId)?.title || "";
-  };
-
-  const getProjectNameForExport = (task: Task): string => {
-    if (!task.projectId) return "";
-    return projectById.get(task.projectId)?.name || "";
-  };
-
   const handleDownloadCsv = () => {
     if (!selectedUserId) return;
-    const selectedUser = users.find((u) => String(u.id) === selectedUserId);
 
     const headers = [
-      "User",
-      "Customer",
-      "Project",
-      "Stage",
-      "Assignees",
-      "Status",
-      "Priority",
-      "Start Date",
-      "Due Date",
-      "Estimate (hours)",
+      "User", "Customer", "Project", "Stage", "Assignees",
+      "Status", "Priority", "Start Date", "Due Date", "Estimate (hours)"
     ];
 
     const rows = userTasks.map((task) => {
-      const estimateHours =
-        (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
-
+      const estimateHours = (task.estimateHours || 0) + (task.estimateMinutes || 0) / 60;
       return [
         selectedUser?.name || "",
         task.title,
@@ -188,6 +240,9 @@ export default function UserReports({
 
   const isLoading = tasksLoading || projectsLoading || bucketsLoading;
 
+  // ----------------------------------------------------------------------
+  // 7. EARLY RETURNS
+  // ----------------------------------------------------------------------
   if (!selectedUserId || selectedUserId === "") {
     return (
       <div className="space-y-6">
@@ -217,8 +272,9 @@ export default function UserReports({
     );
   }
 
-  const selectedUser = users.find((u) => String(u.id) === selectedUserId);
-
+  // ----------------------------------------------------------------------
+  // 8. FINAL RENDER
+  // ----------------------------------------------------------------------
   return (
     <div className="space-y-6">
       <Card>
@@ -251,7 +307,7 @@ export default function UserReports({
         </CardContent>
       </Card>
 
-      {tasksLoading ? (
+      {isLoading ? (
         <div className="grid gap-4 md:grid-cols-4">
           <Skeleton className="h-[120px]" />
           <Skeleton className="h-[120px]" />
@@ -362,9 +418,9 @@ export default function UserReports({
                           border: "1px solid hsl(var(--border))",
                         }}
                       />
-                      <Legend 
-                        layout="horizontal" 
-                        verticalAlign="bottom" 
+                      <Legend
+                        layout="horizontal"
+                        verticalAlign="bottom"
                         align="center"
                         wrapperStyle={{ paddingTop: 10 }}
                       />
@@ -409,10 +465,92 @@ export default function UserReports({
               </Card>
             </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6"
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-lg font-medium">Detailed Report</CardTitle>
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    placeholder="Search customers or projects..."
+                    className="w-full px-3 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="overflow-x-auto max-h-[400px]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                        <tr className="text-left font-medium text-muted-foreground">
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('title')}>
+                            Customer {sortConfig.key === 'title' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('project')}>
+                            Project {sortConfig.key === 'project' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('stage')}>
+                            Stage {sortConfig.key === 'stage' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('status')}>
+                            Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3">Priority</th>
+                          <th className="p-3 text-right">Estimate (h)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {sortedTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                              No matching results found.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedTasks.map((task) => (
+                            <tr key={task.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-medium">{task.title}</td>
+                              <td className="p-3 text-xs">{getProjectNameForExport(task)}</td>
+                              <td className="p-3 text-xs text-muted-foreground">{getBucketTitleForExport(task)}</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${task.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    task.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      'bg-slate-50 text-slate-700 border-slate-200'
+                                  }`}>
+                                  {task.status?.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                    task.priority === 'medium' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-green-100 text-green-700'
+                                  }`}>
+                                  {task.priority}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                {((task.estimateHours || 0) + (task.estimateMinutes || 0) / 60).toFixed(1)}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </>
       )}
     </div>
   );
 }
-
-

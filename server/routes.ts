@@ -576,7 +576,20 @@ export async function registerRoutes(
         }
       }
 
-      const task = await storage.updateTask(Number(req.params.id), input);
+      const updatePayload = { ...input };
+      if (isCompletion && !updatePayload.history) {
+        updatePayload.history = [
+          ...(existingTask?.history || []),
+          {
+            action: "Status changed to Completed",
+            userId: currentUser.id,
+            userName: currentUser.name ?? null,
+            timestamp: new Date().toISOString(),
+          },
+        ];
+      }
+
+      const task = await storage.updateTask(Number(req.params.id), updatePayload);
       const nowOverdue = isTaskOverdue(task, todayKey);
       if (!wasOverdue && nowOverdue) {
         // Trigger a reminder when a task crosses into overdue state.
@@ -660,6 +673,114 @@ export async function registerRoutes(
                 status: sent ? "sent" : "failed",
               });
             }
+          }
+        }
+      }
+
+      if (isCompletion && task.bucketId) {
+        const canAutoCreate =
+          currentUser.role === "Admin" || hasPermission(currentUser, "CREATE_TASK");
+
+        if (canAutoCreate) {
+          try {
+            const buckets = await storage.getBuckets(task.projectId);
+            const currentBucketIndex = buckets.findIndex(
+              (b) => b.id === task.bucketId,
+            );
+            const nextBucket = buckets[currentBucketIndex + 1];
+
+            if (nextBucket) {
+              const currentBucket = buckets[currentBucketIndex];
+              const currentConfig = currentBucket?.customFieldsConfig || [];
+              const nextConfig = nextBucket.customFieldsConfig || [];
+              let mergedConfig = nextConfig;
+
+              if (currentConfig.length > 0) {
+                const nextKeys = new Set(nextConfig.map((field) => field.key));
+                const missing = currentConfig.filter(
+                  (field) => !nextKeys.has(field.key),
+                );
+                if (missing.length > 0) {
+                  mergedConfig = [...nextConfig, ...missing];
+                  await storage.updateBucket(nextBucket.id, {
+                    customFieldsConfig: mergedConfig,
+                  });
+                }
+              }
+
+              let customFields: string | undefined;
+              if (task.customFields) {
+                const filtered = getCustomFieldsForConfig(
+                  task.customFields,
+                  mergedConfig,
+                );
+                if (Object.keys(filtered).length > 0) {
+                  customFields = serializeCustomFields(filtered);
+                }
+              }
+
+              const nextBucketTasks = await storage.getTasksByBucket(nextBucket.id);
+              const maxPosition =
+                nextBucketTasks.length > 0
+                  ? Math.max(...nextBucketTasks.map((t) => t.position ?? 0))
+                  : -1;
+
+              const newTask = await storage.createTask({
+                title: task.title,
+                description: task.description || "",
+                status: "todo",
+                priority: task.priority,
+                projectId: task.projectId,
+                bucketId: nextBucket.id,
+                assigneeId: task.assigneeId,
+                assignedUsers: task.assignedUsers || [],
+                startDate: task.startDate ?? null,
+                dueDate: task.dueDate ?? null,
+                estimateHours: task.estimateHours || 0,
+                estimateMinutes: task.estimateMinutes || 0,
+                position: maxPosition + 1,
+                checklist: [],
+                attachments: [],
+                customFields,
+                history: [
+                  {
+                    action: `Auto-created from completed customer in ${currentBucket?.title || "previous stage"}`,
+                    userId: currentUser.id,
+                    userName: currentUser.name ?? null,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              });
+
+              await maybeCreateOverdueNotifications(newTask, todayKey);
+
+              if (newTask.assigneeId) {
+                const assignee = await storage.getUser(newTask.assigneeId);
+                if (assignee?.email && project) {
+                  const { subject, html } = createTaskAssignmentEmail({
+                    taskTitle: newTask.title,
+                    taskDescription: newTask.description || undefined,
+                    projectName: project.name,
+                    assignedBy: currentUser?.name || "System",
+                    dueDate: newTask.dueDate,
+                  });
+
+                  const sent = await sendEmail({
+                    to: assignee.email,
+                    subject,
+                    html,
+                  });
+                  await storage.createNotification({
+                    taskId: newTask.id,
+                    userId: assignee.id,
+                    type: "assignment",
+                    status: sent ? "sent" : "failed",
+                  });
+                }
+              }
+            }
+          } catch (progressErr) {
+            console.error("Failed to auto-progress task:", progressErr);
           }
         }
       }

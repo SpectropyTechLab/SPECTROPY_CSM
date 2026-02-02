@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -63,6 +64,9 @@ export default function BucketReports({
   isAdmin,
   currentUserId,
 }: BucketReportsProps) {
+  // ----------------------------------------------------------------------
+  // 1. DATA HOOKS
+  // ----------------------------------------------------------------------
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks"],
   });
@@ -75,93 +79,40 @@ export default function BucketReports({
     queryKey: ["/api/users"],
   });
 
-  const filteredBuckets =
-    selectedProjectFilter === "all"
-      ? buckets
-      : buckets.filter((b) => String(b.projectId) === selectedProjectFilter);
-
-  const selectedBucket = buckets.find((b) => String(b.id) === selectedBucketId);
-
-  const bucketTasks = tasks.filter((t) => {
-    if (String(t.bucketId) !== selectedBucketId) return false;
-    if (!isAdmin) {
-      const assignedUsers = t.assignedUsers || [];
-      if (
-        !assignedUsers.includes(currentUserId) &&
-        t.assigneeId !== currentUserId
-      ) {
-        return false;
-      }
-    }
-    return true;
+  // ----------------------------------------------------------------------
+  // 2. UI STATE
+  // ----------------------------------------------------------------------
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' | null }>({
+    key: 'title',
+    direction: null
   });
 
-  const totalInBucket = bucketTasks.length;
-  const highPriority = bucketTasks.filter((t) => t.priority === "high").length;
-  const overdueTasks = bucketTasks.filter((t) => {
-    if (!t.dueDate || t.status === "completed") return false;
-    return new Date(t.dueDate) < new Date();
-  }).length;
+  // ----------------------------------------------------------------------
+  // 3. MEMOIZED LOOKUPS
+  // ----------------------------------------------------------------------
+  const userById = useMemo(() => {
+    const map = new Map<number, User>();
+    users.forEach((user) => map.set(user.id, user));
+    return map;
+  }, [users]);
 
-  const estimatedMinutes = bucketTasks.reduce((sum, t) => {
-    return sum + (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
-  }, 0);
-  const avgTimePerTask =
-    totalInBucket > 0 ? Math.round(estimatedMinutes / totalInBucket) : 0;
-  const avgHours = Math.floor(avgTimePerTask / 60);
-  const avgMins = avgTimePerTask % 60;
+  const projectById = useMemo(() => {
+    const map = new Map<number, Project>();
+    projects.forEach((project) => map.set(project.id, project));
+    return map;
+  }, [projects]);
 
-  const statusData = [
-    {
-      status: "Not Started",
-      count: bucketTasks.filter((t) => t.status === "todo").length,
-    },
-    {
-      status: "In Progress",
-      count: bucketTasks.filter((t) => t.status === "in_progress").length,
-    },
-    {
-      status: "Completed",
-      count: bucketTasks.filter((t) => t.status === "completed").length,
-    },
-  ];
-
-  const priorityData = [
-    {
-      priority: "High",
-      count: bucketTasks.filter((t) => t.priority === "high").length,
-    },
-    {
-      priority: "Medium",
-      count: bucketTasks.filter((t) => t.priority === "medium").length,
-    },
-    {
-      priority: "Low",
-      count: bucketTasks.filter((t) => t.priority === "low").length,
-    },
-  ];
-
-  const userById = new Map<number, User>();
-  users.forEach((user) => {
-    userById.set(user.id, user);
-  });
-
-  const projectById = new Map<number, Project>();
-  projects.forEach((project) => {
-    projectById.set(project.id, project);
-  });
-
+  // ----------------------------------------------------------------------
+  // 4. HELPER FUNCTIONS
+  // ----------------------------------------------------------------------
   const getAssigneeNamesForExport = (task: Task): string => {
     const ids = new Set<number>();
-    if (task.assigneeId) {
-      ids.add(task.assigneeId);
-    }
+    if (task.assigneeId) ids.add(task.assigneeId);
     for (const id of task.assignedUsers || []) {
       ids.add(id);
     }
-
     if (ids.size === 0) return "";
-
     return Array.from(ids)
       .map((id) => userById.get(id)?.name || `User ${id}`)
       .join(", ");
@@ -172,18 +123,108 @@ export default function BucketReports({
     return projectById.get(task.projectId)?.name || "";
   };
 
+  // ----------------------------------------------------------------------
+  // 5. DATA PROCESSING
+  // ----------------------------------------------------------------------
+
+  // Filter Buckets based on Project dropdown
+  const filteredBuckets = useMemo(() => {
+    return selectedProjectFilter === "all"
+      ? buckets
+      : buckets.filter((b) => String(b.projectId) === selectedProjectFilter);
+  }, [buckets, selectedProjectFilter]);
+
+  const selectedBucket = buckets.find((b) => String(b.id) === selectedBucketId);
+
+  // Filter Tasks belonging to the selected Bucket (+ Permissions)
+  const bucketTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      if (String(t.bucketId) !== selectedBucketId) return false;
+      if (!isAdmin) {
+        const assignedUsers = t.assignedUsers || [];
+        if (!assignedUsers.includes(currentUserId) && t.assigneeId !== currentUserId) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [tasks, selectedBucketId, isAdmin, currentUserId]);
+
+  // Filter for Table (Search)
+  const tableTasks = useMemo(() => {
+    return bucketTasks.filter(task =>
+      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getProjectNameForExport(task).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [bucketTasks, searchTerm, projectById]);
+
+  // Sort Logic
+  const sortedTasks = useMemo(() => {
+    if (!sortConfig.direction) return tableTasks;
+
+    return [...tableTasks].sort((a, b) => {
+      let aVal: any = a[sortConfig.key as keyof Task] ?? '';
+      let bVal: any = b[sortConfig.key as keyof Task] ?? '';
+
+      // Special Sorts
+      if (sortConfig.key === 'project') {
+        aVal = getProjectNameForExport(a);
+        bVal = getProjectNameForExport(b);
+      } else if (sortConfig.key === 'dueDate') {
+        aVal = new Date(a.dueDate || 0).getTime();
+        bVal = new Date(b.dueDate || 0).getTime();
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [tableTasks, sortConfig, projectById]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    else if (sortConfig.key === key && sortConfig.direction === 'desc') direction = null;
+    setSortConfig({ key, direction });
+  };
+
+  // ----------------------------------------------------------------------
+  // 6. STATISTICS
+  // ----------------------------------------------------------------------
+  const totalInBucket = bucketTasks.length;
+  const highPriority = bucketTasks.filter((t) => t.priority === "high").length;
+
+  const overdueTasks = bucketTasks.filter((t) => {
+    if (!t.dueDate || t.status === "completed") return false;
+    return new Date(t.dueDate) < new Date();
+  }).length;
+
+  const estimatedMinutes = bucketTasks.reduce((sum, t) => {
+    return sum + (t.estimateHours || 0) * 60 + (t.estimateMinutes || 0);
+  }, 0);
+
+  const avgTimePerTask = totalInBucket > 0 ? Math.round(estimatedMinutes / totalInBucket) : 0;
+  const avgHours = Math.floor(avgTimePerTask / 60);
+  const avgMins = avgTimePerTask % 60;
+
+  const statusData = [
+    { status: "Not Started", count: bucketTasks.filter((t) => t.status === "todo").length },
+    { status: "In Progress", count: bucketTasks.filter((t) => t.status === "in_progress").length },
+    { status: "Completed", count: bucketTasks.filter((t) => t.status === "completed").length },
+  ];
+
+  const priorityData = [
+    { priority: "High", count: bucketTasks.filter((t) => t.priority === "high").length },
+    { priority: "Medium", count: bucketTasks.filter((t) => t.priority === "medium").length },
+    { priority: "Low", count: bucketTasks.filter((t) => t.priority === "low").length },
+  ];
+
   const handleDownloadCsv = () => {
     if (!selectedBucket) return;
 
     const headers = [
-      "Stage",
-      "Project",
-      "Customer",
-      "Assignees",
-      "Status",
-      "Priority",
-      "Start Date",
-      "Due Date",
+      "Stage", "Project", "Customer", "Assignees",
+      "Status", "Priority", "Start Date", "Due Date"
     ];
 
     const rows = bucketTasks.map((task) => [
@@ -203,6 +244,9 @@ export default function BucketReports({
 
   const isLoading = tasksLoading || bucketsLoading || usersLoading;
 
+  // ----------------------------------------------------------------------
+  // 7. EARLY RETURNS
+  // ----------------------------------------------------------------------
   if (!selectedBucketId || selectedBucketId === "") {
     return (
       <div className="space-y-6">
@@ -218,10 +262,7 @@ export default function BucketReports({
                     value={selectedProjectFilter}
                     onValueChange={onProjectFilterChange}
                   >
-                    <SelectTrigger
-                      className="w-[200px]"
-                      data-testid="select-bucket-project-filter"
-                    >
+                    <SelectTrigger className="w-[200px]" data-testid="select-bucket-project-filter">
                       <SelectValue placeholder="All Projects" />
                     </SelectTrigger>
                     <SelectContent>
@@ -239,10 +280,7 @@ export default function BucketReports({
                     Select Stage
                   </label>
                   <Select value={selectedBucketId} onValueChange={onBucketChange}>
-                    <SelectTrigger
-                      className="w-[200px]"
-                      data-testid="select-bucket-report"
-                    >
+                    <SelectTrigger className="w-[200px]" data-testid="select-bucket-report">
                       <SelectValue placeholder="Choose a stage..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -273,6 +311,9 @@ export default function BucketReports({
     );
   }
 
+  // ----------------------------------------------------------------------
+  // 8. FINAL RENDER
+  // ----------------------------------------------------------------------
   return (
     <div className="space-y-6">
       <Card>
@@ -287,10 +328,7 @@ export default function BucketReports({
                   value={selectedProjectFilter}
                   onValueChange={onProjectFilterChange}
                 >
-                  <SelectTrigger
-                    className="w-[200px]"
-                    data-testid="select-bucket-project-filter"
-                  >
+                  <SelectTrigger className="w-[200px]" data-testid="select-bucket-project-filter">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -308,10 +346,7 @@ export default function BucketReports({
                   Select Stage
                 </label>
                 <Select value={selectedBucketId} onValueChange={onBucketChange}>
-                  <SelectTrigger
-                    className="w-[200px]"
-                    data-testid="select-bucket-report"
-                  >
+                  <SelectTrigger className="w-[200px]" data-testid="select-bucket-report">
                     <SelectValue placeholder="Choose a stage..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -360,7 +395,7 @@ export default function BucketReports({
               <CardContent>
                 <div className="text-2xl font-bold">{totalInBucket}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Currently in {selectedBucket?.name || "stage"}
+                  Currently in {selectedBucket?.title || "stage"}
                 </p>
               </CardContent>
             </Card>
@@ -511,10 +546,90 @@ export default function BucketReports({
               </Card>
             </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-6"
+          >
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-lg font-medium">Detailed Report</CardTitle>
+                <div className="relative w-64">
+                  <input
+                    type="text"
+                    placeholder="Search customers or projects..."
+                    className="w-full px-3 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="overflow-x-auto max-h-[400px]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10 shadow-sm">
+                        <tr className="text-left font-medium text-muted-foreground">
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('title')}>
+                            Customer {sortConfig.key === 'title' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('project')}>
+                            Project {sortConfig.key === 'project' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3 cursor-pointer hover:text-primary" onClick={() => requestSort('dueDate')}>
+                            Due Date {sortConfig.key === 'dueDate' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                          </th>
+                          <th className="p-3">Assignees</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Priority</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {sortedTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                              No matching results found.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedTasks.map((task) => (
+                            <tr key={task.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="p-3 font-medium">{task.title}</td>
+                              <td className="p-3 text-xs">{getProjectNameForExport(task)}</td>
+                              <td className="p-3 text-xs font-mono">
+                                {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "-"}
+                              </td>
+                              <td className="p-3 text-xs text-muted-foreground">{getAssigneeNamesForExport(task)}</td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${task.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                    task.status === 'in_progress' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      'bg-slate-50 text-slate-700 border-slate-200'
+                                  }`}>
+                                  {task.status?.replace("_", " ")}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                    task.priority === 'medium' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-green-100 text-green-700'
+                                  }`}>
+                                  {task.priority}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         </>
       )}
     </div>
   );
 }
-
-

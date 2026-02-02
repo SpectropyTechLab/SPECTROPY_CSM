@@ -490,7 +490,7 @@ export default function UserTasks() {
           {sortedTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                <Briefcase className="h-8 w-8 text-slate-300" />
+
               </div>
               <h3 className="text-lg font-semibold text-slate-900">No customers found</h3>
               <p className="text-slate-500 max-w-sm mt-1">

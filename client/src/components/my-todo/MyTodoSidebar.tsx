@@ -29,49 +29,62 @@ export default function MyTodoSidebar({
   counts,
 }: MyTodoSidebarProps) {
   return (
-    <aside className="w-full lg:w-64">
-      <div className="rounded-2xl bg-white/60 backdrop-blur-sm border border-transparent lg:border-slate-100 shadow-sm lg:shadow-none p-2">
-        <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible">
-          {filters.map((filter) => {
-            const isActive = activeFilter === filter.key;
-            const Icon = filter.icon;
-            const count = counts[filter.key];
-            return (
-              <button
-                key={filter.key}
-                onClick={() => onFilterChange(filter.key)}
-                className={cn(
-                  "flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors whitespace-nowrap lg:whitespace-normal",
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm border border-slate-100"
-                    : "text-slate-500 hover:bg-white/70",
-                )}
-                type="button"
-              >
-                <div className="flex items-center gap-3">
-                  <Icon
-                    className={cn(
-                      "h-4 w-4",
-                      filter.key === "overdue" ? "text-red-400" : "text-slate-400",
-                    )}
-                  />
-                  <span>{filter.label}</span>
-                </div>
+    <nav className="w-full">
+      {/* Removed 'flex lg:flex-col' and 'overflow-x-auto' 
+          This container is now strictly a vertical stack (flex-col)
+      */}
+      <div className="flex flex-col gap-1.5">
+        {filters.map((filter) => {
+          const isActive = activeFilter === filter.key;
+          const Icon = filter.icon;
+          const count = counts[filter.key];
+
+          return (
+            <button
+              key={filter.key}
+              onClick={() => onFilterChange(filter.key)}
+              className={cn(
+                "group flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                isActive
+                  ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+              )}
+              type="button"
+            >
+              <div className="flex items-center gap-3">
+                <Icon
+                  className={cn(
+                    "h-5 w-5 transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : filter.key === "overdue" && count > 0
+                        ? "text-red-500"
+                        : "text-slate-400 group-hover:text-slate-600",
+                  )}
+                />
+                <span className={cn(isActive ? "font-semibold" : "font-medium")}>
+                  {filter.label}
+                </span>
+              </div>
+
+              {count > 0 && (
                 <span
                   className={cn(
-                    "text-xs font-semibold px-2 py-0.5 rounded-full",
-                    filter.key === "overdue" && count > 0
-                      ? "bg-red-100 text-red-600"
-                      : "bg-slate-100 text-slate-500",
+                    "min-w-[1.5rem] h-5 flex items-center justify-center text-[10px] font-bold px-1.5 rounded-md border transition-colors",
+                    isActive
+                      ? "bg-primary text-white border-primary"
+                      : filter.key === "overdue"
+                        ? "bg-red-50 text-red-600 border-red-100"
+                        : "bg-slate-50 text-slate-500 border-slate-200"
                   )}
                 >
                   {count}
                 </span>
-              </button>
-            );
-          })}
-        </div>
+              )}
+            </button>
+          );
+        })}
       </div>
-    </aside>
+    </nav>
   );
 }
