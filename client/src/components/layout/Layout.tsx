@@ -28,7 +28,7 @@ export function Layout({ children }: LayoutProps) {
       />
       <MobileHeader onMenuClick={handleOpenMobileSidebar} />
       <main className="flex-1 pt-14 md:pt-0 p-4 md:p-6 md:pl-72 overflow-y-auto animate-in fade-in duration-500">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto h-full">
           {children}
         </div>
       </main>

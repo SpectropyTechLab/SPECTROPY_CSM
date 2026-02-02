@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,15 @@ interface BucketWithTasks extends Bucket {
   tasks: Task[];
 }
 
+type BoardView = "stage" | "assignee" | "due_date" | "title";
+
+interface BoardColumn {
+  id: string;
+  title: string;
+  tasks: Task[];
+  bucket?: BucketWithTasks;
+}
+
 export default function ProjectBoard() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -115,6 +124,10 @@ export default function ProjectBoard() {
     timestamp: new Date().toISOString(),
   });
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [viewMode, setViewMode] = useState<BoardView>("stage");
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
+  const scrollDirectionRef = useRef<"left" | "right" | null>(null);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [isNewBucketOpen, setIsNewBucketOpen] = useState(false);
   const [isEditTaskOpen, setIsEditTaskOpen] = useState(false);
@@ -156,7 +169,7 @@ export default function ProjectBoard() {
   const [editTaskCustomFields, setEditTaskCustomFields] = useState<Record<string, any>>({});
   const [newChecklistItem, setNewChecklistItem] = useState("");
 
-  const [expandedBuckets, setExpandedBuckets] = useState<Record<number, boolean>>({});
+  const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
   const { uploadFile: uploadNewFile, isUploading: isUploadingNew } = useUpload({
     onSuccess: (response) => {
       const newAttachment: Attachment = {
@@ -171,12 +184,66 @@ export default function ProjectBoard() {
     },
   });
 
-  const toggleBucketCompleted = (bucketId: number) => {
-    setExpandedBuckets(prev => ({
+
+  const toggleColumnCompleted = (columnId: string) => {
+    setExpandedColumns((prev) => ({
       ...prev,
-      [bucketId]: !prev[bucketId]
+      [columnId]: !prev[columnId],
     }));
   };
+
+  const stopAutoScroll = () => {
+    scrollDirectionRef.current = null;
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+  };
+
+  const startAutoScroll = (direction: "left" | "right") => {
+    if (scrollDirectionRef.current === direction && scrollRafRef.current) {
+      return;
+    }
+    scrollDirectionRef.current = direction;
+    if (scrollRafRef.current !== null) {
+      return;
+    }
+
+    const step = () => {
+      const container = boardScrollRef.current;
+      if (!container || !scrollDirectionRef.current) {
+        stopAutoScroll();
+        return;
+      }
+      const speed = 14;
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      if (scrollDirectionRef.current === "left") {
+        container.scrollLeft = Math.max(0, container.scrollLeft - speed);
+      } else {
+        container.scrollLeft = Math.min(maxScrollLeft, container.scrollLeft + speed);
+      }
+      scrollRafRef.current = requestAnimationFrame(step);
+    };
+
+    scrollRafRef.current = requestAnimationFrame(step);
+  };
+
+  const handleBoardDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (!draggedTask) return;
+    const container = boardScrollRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const edgeThreshold = 60;
+    if (event.clientX - rect.left < edgeThreshold) {
+      startAutoScroll("left");
+    } else if (rect.right - event.clientX < edgeThreshold) {
+      startAutoScroll("right");
+    } else {
+      stopAutoScroll();
+    }
+  };
+
+  useEffect(() => () => stopAutoScroll(), []);
 
   const { uploadFile: uploadEditFile, isUploading: isUploadingEdit } = useUpload({
     onSuccess: (response) => {
@@ -330,6 +397,7 @@ export default function ProjectBoard() {
     }
   };
 
+  {/*function to filter and sort buckted and task*/ }
   const bucketsWithTasks: BucketWithTasks[] = buckets.map((bucket) => ({
     ...bucket,
     tasks: tasks
@@ -343,6 +411,7 @@ export default function ProjectBoard() {
 
   const handleDragEnd = () => {
     setDraggedTask(null);
+    stopAutoScroll();
   };
 
   const handleDrop = (bucketId: number, targetPosition: number) => {
@@ -360,6 +429,7 @@ export default function ProjectBoard() {
       ],
     });
     setDraggedTask(null);
+    stopAutoScroll();
   };
 
   const handleAddTask = () => {
@@ -916,12 +986,18 @@ export default function ProjectBoard() {
     }
   };
 
+  const getAssigneeIds = (task: Task) => {
+    if (task.assignedUsers && task.assignedUsers.length > 0) {
+      return task.assignedUsers;
+    }
+    if (task.assigneeId) {
+      return [task.assigneeId];
+    }
+    return [];
+  };
+
   const getAssignees = (task: Task) => {
-    const assigneeIds = task.assignedUsers?.length
-      ? task.assignedUsers
-      : task.assigneeId
-        ? [task.assigneeId]
-        : [];
+    const assigneeIds = getAssigneeIds(task);
     return users.filter((u) => assigneeIds.includes(u.id));
   };
 
@@ -941,6 +1017,122 @@ export default function ProjectBoard() {
       return <FileText className="h-4 w-4" />;
     return <File className="h-4 w-4" />;
   };
+
+  const viewLabels: Record<BoardView, string> = {
+    stage: "Stage",
+    assignee: "Assignee",
+    due_date: "Due Date",
+    title: "Customers",
+  };
+
+  const getDueDateBucket = (dueDate: Task["dueDate"]) => {
+    if (!dueDate) return "next";
+    const parsed = new Date(dueDate);
+    if (Number.isNaN(parsed.getTime())) return "next";
+
+    const today = new Date();
+    const startOfToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+    const startOfDayAfterTomorrow = new Date(startOfToday);
+    startOfDayAfterTomorrow.setDate(startOfDayAfterTomorrow.getDate() + 2);
+
+    const dueStart = new Date(
+      parsed.getFullYear(),
+      parsed.getMonth(),
+      parsed.getDate(),
+    );
+
+    if (dueStart < startOfToday) return "overdue";
+    if (dueStart.getTime() === startOfToday.getTime()) return "today";
+    if (dueStart.getTime() === startOfTomorrow.getTime()) return "tomorrow";
+    if (dueStart >= startOfDayAfterTomorrow) return "next";
+    return "next";
+  };
+
+  const boardColumns: BoardColumn[] = (() => {
+    if (viewMode === "stage") {
+      return bucketsWithTasks.map((bucket) => ({
+        id: `stage-${bucket.id}`,
+        title: bucket.title,
+        tasks: bucket.tasks,
+        bucket,
+      }));
+    }
+
+    if (viewMode === "assignee") {
+      const sortedUsers = [...users].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      );
+      const unassignedTasks = tasks.filter(
+        (task) => getAssigneeIds(task).length === 0,
+      );
+
+      return [
+        {
+          id: "assignee-unassigned",
+          title: "Unassigned",
+          tasks: unassignedTasks,
+        },
+        ...sortedUsers.map((user) => ({
+          id: `assignee-${user.id}`,
+          title: user.name,
+          tasks: tasks.filter((task) =>
+            getAssigneeIds(task).includes(user.id),
+          ),
+        })),
+      ];
+    }
+
+    if (viewMode === "due_date") {
+      const groups: Record<"overdue" | "today" | "tomorrow" | "next", Task[]> =
+      {
+        overdue: [],
+        today: [],
+        tomorrow: [],
+        next: [],
+      };
+
+      tasks.forEach((task) => {
+        const key = getDueDateBucket(task.dueDate);
+        if (key === "overdue" || key === "today" || key === "tomorrow") {
+          groups[key].push(task);
+          return;
+        }
+        groups.next.push(task);
+      });
+
+      return [
+        { id: "due-overdue", title: "Overdue", tasks: groups.overdue },
+        { id: "due-today", title: "Today", tasks: groups.today },
+        { id: "due-tomorrow", title: "Tomorrow", tasks: groups.tomorrow },
+        { id: "due-next", title: "Next Dates", tasks: groups.next },
+      ];
+    }
+
+    const titleGroups = new Map<string, Task[]>();
+    tasks.forEach((task) => {
+      const title = task.title?.trim() || "Untitled";
+      const existing = titleGroups.get(title);
+      if (existing) {
+        existing.push(task);
+      } else {
+        titleGroups.set(title, [task]);
+      }
+    });
+
+    return Array.from(titleGroups.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([title, groupedTasks]) => ({
+        id: `title-${title}`,
+        title,
+        tasks: groupedTasks,
+      }));
+  })();
 
   if (projectLoading || bucketsLoading) {
     return (
@@ -967,6 +1159,7 @@ export default function ProjectBoard() {
 
   return (
     <div className="flex flex-col h-full">
+      {/*Header*/}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 border-b bg-white dark:bg-slate-900">
         <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Button
@@ -991,176 +1184,239 @@ export default function ProjectBoard() {
           </div>
         </div>
 
-        <Dialog open={isNewBucketOpen} onOpenChange={setIsNewBucketOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-full sm:w-auto"
-              data-testid="button-add-bucket"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Stage
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Stage</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <Input
-                placeholder="Stage title..."
-                value={newBucketTitle}
-                onChange={(e) => setNewBucketTitle(e.target.value)}
-                data-testid="input-bucket-title"
-              />
-            </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
-                onClick={handleAddBucket}
-                disabled={createBucketMutation.isPending}
-                data-testid="button-submit-bucket"
+                variant="outline"
+                className="w-full sm:w-auto justify-between"
+                data-testid="button-view-mode"
               >
-                Add Stage
+                <span className="truncate">View: {viewLabels[viewMode]}</span>
+                <ChevronDown className="h-4 w-4 ml-2" />
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className={viewMode === "stage" ? "bg-accent" : ""}
+                onClick={() => setViewMode("stage")}
+              >
+                Stage
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={viewMode === "assignee" ? "bg-accent" : ""}
+                onClick={() => setViewMode("assignee")}
+              >
+                Assignee
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={viewMode === "due_date" ? "bg-accent" : ""}
+                onClick={() => setViewMode("due_date")}
+              >
+                Due Date
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={viewMode === "title" ? "bg-accent" : ""}
+                onClick={() => setViewMode("title")}
+              >
+                Customers
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-      <div className="flex-1 overflow-x-auto p-2 md:p-4 ">
+          {viewMode === "stage" && (
+            <Dialog open={isNewBucketOpen} onOpenChange={setIsNewBucketOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  data-testid="button-add-bucket"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Stage
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Stage</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <Input
+                    placeholder="Stage title..."
+                    value={newBucketTitle}
+                    onChange={(e) => setNewBucketTitle(e.target.value)}
+                    data-testid="input-bucket-title"
+                  />
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button
+                    onClick={handleAddBucket}
+                    disabled={createBucketMutation.isPending}
+                    data-testid="button-submit-bucket"
+                  >
+                    Add Stage
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+      </div>
+      {/*Body*/}
+      <div
+        ref={boardScrollRef}
+        className="flex-1 overflow-x-auto p-2 md:p-4 h-full"
+        onDragOver={handleBoardDragOver}
+        onDragLeave={stopAutoScroll}
+        onDrop={stopAutoScroll}
+      >
         <div
-          className="flex gap-3 md:gap-4 h-full pb-4"
+          className="flex gap-3 md:gap-4 h-full  pb-4 "
           style={{ minWidth: "max-content" }}
         >
-          {bucketsWithTasks.map((bucket) => {
-            const activeTasks = bucket.tasks
-              .filter((t) => t.status !== "completed")
-              .sort((a, b) => b.id - a.id); // Sort by newest ID first
-
-            const completedTasks = bucket.tasks
-              .filter((t) => t.status === "completed")
-              .sort((a, b) => b.id - a.id);
-
-            const isExpanded = expandedBuckets[bucket.id] ?? false;
+          {/*bucket componenet */}
+          {boardColumns.map((column) => {
+            const isStageView = viewMode === "stage";
+            const bucket = column.bucket;
             return (
+
               <motion.div
-                key={bucket.id}
+                key={column.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col w-72 md:w-80 bg-slate-50 dark:bg-slate-800/50 rounded-lg flex-shrink-0"
-                data-testid={`bucket-column-${bucket.id}`}
+                data-testid={
+                  isStageView && bucket
+                    ? `bucket-column-${bucket.id}`
+                    : `bucket-column-${column.id}`
+                }
               >
+                {/*bucket component header*/}
                 <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2">
-                    {editingBucketId === bucket.id ? (
-                      <Input
-                        value={editingBucketTitle}
-                        onChange={(e) => setEditingBucketTitle(e.target.value)}
-                        onBlur={() => handleSaveBucketTitle(bucket.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSaveBucketTitle(bucket.id);
-                          else if (e.key === "Escape") {
-                            setEditingBucketId(null);
-                            setEditingBucketTitle("");
-                          }
-                        }}
-                        autoFocus
-                        className="h-7 w-40 text-sm font-medium"
-                        data-testid={`input-edit-bucket-title-${bucket.id}`}
-                      />
-                    ) : (
-                      <h3
-                        className="font-medium cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => {
-                          setEditingBucketId(bucket.id);
-                          setEditingBucketTitle(bucket.title);
-                        }}
-                        data-testid={`text-bucket-title-${bucket.id}`}
-                      >
-                        {bucket.title}
-                      </h3>
-                    )}
-                    <Badge variant="secondary" className="text-xs">
-                      {bucket.tasks.length}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        if (!canCreateTask) {
-                          toast({
-                            title: "Permission denied",
-                            description:
-                              "You do not have permission to create customers",
-                            variant: "destructive",
-                          });
-                          return;
-                        }
-                        setSelectedBucketId(bucket.id);
-                        setIsNewTaskOpen(true);
-                      }}
-                      disabled={!canCreateTask}
-                      data-testid={`button-add-task-${bucket.id}`}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                  {isStageView && bucket ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        {editingBucketId === bucket.id ? (
+                          <Input
+                            value={editingBucketTitle}
+                            onChange={(e) => setEditingBucketTitle(e.target.value)}
+                            onBlur={() => handleSaveBucketTitle(bucket.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSaveBucketTitle(bucket.id);
+                              else if (e.key === "Escape") {
+                                setEditingBucketId(null);
+                                setEditingBucketTitle("");
+                              }
+                            }}
+                            autoFocus
+                            className="h-7 w-40 text-sm font-medium"
+                            data-testid={`input-edit-bucket-title-${bucket.id}`}
+                          />
+                        ) : (
+                          <h3
+                            className="font-medium cursor-pointer hover:text-primary transition-colors"
+                            onClick={() => {
+                              setEditingBucketId(bucket.id);
+                              setEditingBucketTitle(bucket.title);
+                            }}
+                            data-testid={`text-bucket-title-${bucket.id}`}
+                          >
+                            {bucket.title}
+                          </h3>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {bucket.tasks.length}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          data-testid={`button-bucket-menu-${bucket.id}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
                           onClick={() => {
-                            setEditingBucketId(bucket.id);
-                            setEditingBucketTitle(bucket.title);
+                            if (!canCreateTask) {
+                              toast({
+                                title: "Permission denied",
+                                description:
+                                  "You do not have permission to create customers",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setSelectedBucketId(bucket.id);
+                            setIsNewTaskOpen(true);
                           }}
+                          disabled={!canCreateTask}
+                          data-testid={`button-add-task-${bucket.id}`}
                         >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Rename Stage
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {/* ADD THIS - Custom Fields Settings */}
-                        <DropdownMenuItem
-                          onSelect={(e) => e.preventDefault()}
-                          className="p-0"
-                        >
-                          <BucketSettingsDialog
-                            bucketId={bucket.id}
-                            currentConfig={bucket.customFieldsConfig || []}
-                          />
-                        </DropdownMenuItem>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              data-testid={`button-bucket-menu-${bucket.id}`}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingBucketId(bucket.id);
+                                setEditingBucketTitle(bucket.title);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Rename Stage
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            {/* ADD THIS - Custom Fields Settings */}
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="p-0"
+                            >
+                              <BucketSettingsDialog
+                                bucketId={bucket.id}
+                                currentConfig={bucket.customFieldsConfig || []}
+                              />
+                            </DropdownMenuItem>
 
-                        {/* END ADD */}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDeleteBucket(bucket)}
-                          data-testid={`button-delete-bucket-${bucket.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Stage
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                            {/* END ADD */}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteBucket(bucket)}
+                              data-testid={`button-delete-bucket-${bucket.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Stage
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="font-medium truncate" title={column.title}>
+                        {column.title}
+                      </h3>
+                      <Badge variant="secondary" className="text-xs">
+                        {column.tasks.length}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
-
+                {/*bucket component body*/}
                 <div
                   className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
                   onDragOver={(e) => {
+                    if (!isStageView) return;
                     e.preventDefault();
                     e.currentTarget.classList.add(
                       "bg-slate-100",
@@ -1168,18 +1424,20 @@ export default function ProjectBoard() {
                     );
                   }}
                   onDragLeave={(e) => {
+                    if (!isStageView) return;
                     e.currentTarget.classList.remove(
                       "bg-slate-100",
                       "dark:bg-slate-700/50",
                     );
                   }}
                   onDrop={(e) => {
+                    if (!isStageView || !bucket) return;
                     e.preventDefault();
                     e.currentTarget.classList.remove(
                       "bg-slate-100",
                       "dark:bg-slate-700/50",
                     );
-                    handleDrop(bucket.id, bucket.tasks.length);
+                    handleDrop(bucket.id, column.tasks.length);
                   }}
                 >
 
@@ -1187,29 +1445,32 @@ export default function ProjectBoard() {
                   <div
                     className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px]"
                     onDragOver={(e) => {
+                      if (!isStageView) return;
                       e.preventDefault();
                       e.currentTarget.classList.add("bg-slate-100", "dark:bg-slate-700/50");
                     }}
                     onDragLeave={(e) => {
+                      if (!isStageView) return;
                       e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
                     }}
                     onDrop={(e) => {
+                      if (!isStageView || !bucket) return;
                       e.preventDefault();
                       e.currentTarget.classList.remove("bg-slate-100", "dark:bg-slate-700/50");
-                      handleDrop(bucket.id, bucket.tasks.length);
+                      handleDrop(bucket.id, column.tasks.length);
                     }}
                   >
                     {(() => {
                       // 1. Logic to Sort and Split Tasks
-                      const activeTasks = bucket.tasks
+                      const activeTasks = column.tasks
                         .filter((t) => t.status !== "completed")
                         .sort((a, b) => b.id - a.id); // Sorted by creation (ID proxy)
 
-                      const completedTasks = bucket.tasks
+                      const completedTasks = column.tasks
                         .filter((t) => t.status === "completed")
                         .sort((a, b) => b.id - a.id);
 
-                      const isExpanded = expandedBuckets[bucket.id] ?? false;
+                      const isExpanded = expandedColumns[column.id] ?? false;
 
                       // Helper to render the actual Card UI to avoid duplication
                       const renderTaskCard = (task: Task) => {
@@ -1222,9 +1483,11 @@ export default function ProjectBoard() {
                             key={task.id}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            draggable
-                            onDragStart={() => handleDragStart(task)}
-                            onDragEnd={handleDragEnd}
+                            draggable={isStageView}
+                            onDragStart={
+                              isStageView ? () => handleDragStart(task) : undefined
+                            }
+                            onDragEnd={isStageView ? handleDragEnd : undefined}
                             className={`  active:cursor-grabbing ${draggedTask?.id === task.id ? "opacity-50" : ""}`}
                             data-testid={`task-card-${task.id}`}
                           >
@@ -1502,7 +1765,7 @@ export default function ProjectBoard() {
                             <div className="pt-4 pb-2">
                               <div
                                 className="flex items-center gap-2 cursor-pointer group"
-                                onClick={() => setExpandedBuckets(prev => ({ ...prev, [bucket.id]: !isExpanded }))}
+                                onClick={() => toggleColumnCompleted(column.id)}
                               >
                                 <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700 group-hover:bg-primary/40 transition-colors" />
                                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground whitespace-nowrap bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
@@ -1526,16 +1789,18 @@ export default function ProjectBoard() {
             )
           })}
 
-          <div
-            className="flex items-center justify-center w-80 min-h-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
-            onClick={() => setIsNewBucketOpen(true)}
-            data-testid="button-add-new-bucket"
-          >
-            <div className="text-center text-muted-foreground">
-              <Plus className="h-8 w-8 mx-auto mb-2" />
-              <p>Add Stage</p>
+          {viewMode === "stage" && (
+            <div
+              className="flex items-center justify-center w-80 min-h-[200px] border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover-elevate cursor-pointer"
+              onClick={() => setIsNewBucketOpen(true)}
+              data-testid="button-add-new-bucket"
+            >
+              <div className="text-center text-muted-foreground">
+                <Plus className="h-8 w-8 mx-auto mb-2" />
+                <p>Add Stage</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
