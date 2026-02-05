@@ -42,6 +42,7 @@ import type {
 } from "@shared/schema";
 import { parseCustomFields } from "@shared/customFieldsUtils";
 import { downloadCsv, formatDateForExport } from "@/components/reports/exportUtils";
+import { apiRequest } from "@/lib/queryClient";
 
 type TaskReportProps = {
   selectedProjectId: string;
@@ -54,14 +55,6 @@ type TaskReportProps = {
 type TaskWithParsedFields = Task & {
   parsedCustomFields: Record<string, string>;
 };
-
-function getUserIdHeader(): Record<string, string> {
-  if (typeof localStorage === "undefined") {
-    return {};
-  }
-  const userId = localStorage.getItem("userId");
-  return userId ? { "x-user-id": userId } : {};
-}
 
 function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
@@ -156,13 +149,7 @@ export default function TaskReport({
       const url = selectedProjectId
         ? `/api/tasks?projectId=${selectedProjectId}`
         : "/api/tasks";
-      const res = await fetch(url, {
-        headers: getUserIdHeader(),
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load customers");
-      }
+      const res = await apiRequest("GET", url);
       return res.json();
     },
   });

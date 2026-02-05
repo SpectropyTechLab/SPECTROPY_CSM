@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import type { Notification } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 type OverdueNotificationsResponse = {
   count: number;
@@ -66,12 +67,19 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
 
   const navItems = userRole === "Admin" ? adminNavItems : userNavItems;
 
-  const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userAvatar");
-    window.location.href = "/auth";
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {
+      // ignore logout errors and clear client state regardless
+    } finally {
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("userName");
+      localStorage.removeItem("userAvatar");
+      localStorage.removeItem("isAuthenticated");
+      window.location.href = "/auth";
+    }
   };
 
   const handleNavClick = () => {

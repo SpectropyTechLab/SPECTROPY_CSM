@@ -21,6 +21,7 @@ import {
   hasPermission,
   getUserWithPermissions
 } from "./permissions";
+import { clearSessionCookie, getCurrentUserId, issueSessionCookie } from "./auth";
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -38,19 +39,6 @@ const SALT_ROUNDS = 10;
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-function getCurrentUserId(req: import("express").Request): number {
-
-  const userIdHeader = req.headers["x-user-id"];
-
-
-  if (userIdHeader) {
-    const id = Number(userIdHeader);
-    return Number.isNaN(id) ? 2 : id;
-  }
-
-  return 2;
 }
 
 const getTodayKey = (): string => toDateKey(new Date());
@@ -120,6 +108,55 @@ function getCustomFieldsForConfig(
   return Object.fromEntries(
     Object.entries(parsed).filter(([key]) => allowedKeys.has(key)),
   );
+}
+
+async function buildTaskNotificationData(task: Task, projectName: string) {
+  const bucket = task.bucketId ? await storage.getBucket(task.bucketId) : null;
+  const assignee = task.assigneeId ? await storage.getUser(task.assigneeId) : null;
+  const additionalAssigneeIds = (task.assignedUsers ?? []).filter(
+    (id) => id !== task.assigneeId,
+  );
+  const additionalAssigneeNames = (
+    await Promise.all(
+      additionalAssigneeIds.map(async (id) => {
+        const user = await storage.getUser(id);
+        return user?.name ?? null;
+      }),
+    )
+  ).filter((name): name is string => Boolean(name));
+  const customFields = parseCustomFields(task.customFields ?? null);
+  const customFieldsData =
+    Object.keys(customFields).length > 0 ? customFields : undefined;
+  const checklist = task.checklist ?? [];
+  const checklistCompletedCount = checklist.filter((item) => item.completed).length;
+  const attachmentsCount = (task.attachments ?? []).length;
+  const historyCount = (task.history ?? []).length;
+
+  return {
+    taskId: task.id,
+    taskTitle: task.title,
+    taskDescription: task.description || undefined,
+    projectName,
+    projectId: task.projectId,
+    bucketName: bucket?.title,
+    bucketId: task.bucketId ?? null,
+    status: task.status,
+    priority: task.priority,
+    assigneeName: assignee?.name,
+    assigneeId: task.assigneeId ?? null,
+    assignedUsers: additionalAssigneeNames,
+    startDate: task.startDate ?? null,
+    dueDate: task.dueDate ?? null,
+    estimateHours: task.estimateHours ?? 0,
+    estimateMinutes: task.estimateMinutes ?? 0,
+    checklistCount: checklist.length,
+    checklistCompletedCount,
+    attachmentsCount,
+    historyCount,
+    customFields: customFieldsData,
+    createdAt: task.createdAt ?? null,
+    position: task.position ?? null,
+  };
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -497,12 +534,10 @@ export async function registerRoutes(
         const currentUser = await storage.getUser(getCurrentUserId(req));
 
         if (assignee?.email && project) {
+          const details = await buildTaskNotificationData(task, project.name);
           const { subject, html } = createTaskAssignmentEmail({
-            taskTitle: task.title,
-            taskDescription: task.description || undefined,
-            projectName: project.name,
+            ...details,
             assignedBy: currentUser?.name || "System",
-            dueDate: task.dueDate,
           });
 
           const sent = await sendEmail({ to: assignee.email, subject, html });
@@ -610,10 +645,11 @@ export async function registerRoutes(
             : null;
 
           if (projectOwner?.email) {
+            const details = await buildTaskNotificationData(task, project.name);
             const { subject, html } = createTaskCompletionEmail({
-              taskTitle: task.title,
-              projectName: project.name,
-              assigneeName: assignee?.name || "Unknown",
+              ...details,
+              completedBy: currentUser?.name || assignee?.name || "Unknown",
+              completionDate: new Date(),
             });
 
             const sent = await sendEmail({
@@ -632,12 +668,10 @@ export async function registerRoutes(
           const assignee = await storage.getUser(task.assigneeId);
 
           if (assignee?.email) {
+            const details = await buildTaskNotificationData(task, project.name);
             const { subject, html } = createTaskAssignmentEmail({
-              taskTitle: task.title,
-              taskDescription: task.description || undefined,
-              projectName: project.name,
+              ...details,
               assignedBy: currentUser?.name || "System",
-              dueDate: task.dueDate,
             });
 
             const sent = await sendEmail({ to: assignee.email, subject, html });
@@ -657,12 +691,11 @@ export async function registerRoutes(
             const user = await storage.getUser(userId);
             if (user?.email) {
               const modificationType = Object.keys(input).join(", ");
+              const details = await buildTaskNotificationData(task, project.name);
               const { subject, html } = createTaskUpdateEmail({
-                taskTitle: task.title,
-                projectName: project.name,
+                ...details,
                 modifiedBy: currentUser?.name || "System",
                 modificationType,
-                status: task.status,
               });
 
               const sent = await sendEmail({ to: user.email, subject, html });
@@ -757,12 +790,10 @@ export async function registerRoutes(
               if (newTask.assigneeId) {
                 const assignee = await storage.getUser(newTask.assigneeId);
                 if (assignee?.email && project) {
+                  const details = await buildTaskNotificationData(newTask, project.name);
                   const { subject, html } = createTaskAssignmentEmail({
-                    taskTitle: newTask.title,
-                    taskDescription: newTask.description || undefined,
-                    projectName: project.name,
+                    ...details,
                     assignedBy: currentUser?.name || "System",
-                    dueDate: newTask.dueDate,
                   });
 
                   const sent = await sendEmail({
@@ -1181,6 +1212,7 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      issueSessionCookie(res, user.id);
       const { password: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (err) {
@@ -1189,6 +1221,11 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  app.post("/api/auth/logout", async (_req, res) => {
+    clearSessionCookie(res);
+    res.json({ message: "Logged out" });
   });
 
   // Reports API

@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Bucket, CustomFieldConfig } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DynamicCustomFieldsProps {
   bucketId: number;
@@ -25,7 +26,7 @@ export default function DynamicCustomFields({
   const { data: buckets } = useQuery<Bucket[]>({
     queryKey: ["/api/buckets"],
     queryFn: async () => {
-      const res = await fetch("/api/buckets");
+      const res = await apiRequest("GET", "/api/buckets");
       return res.json();
     },
   });

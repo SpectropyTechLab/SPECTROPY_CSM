@@ -14,6 +14,7 @@ import { Link } from "wouter";
 import TodoOverviewCard from "@/components/dashboard/TodoOverviewCard";
 import { toDateKey, isBeforeDateKey, isSameDateKey } from "@shared/dateUtils";
 import type { Bucket, Project, Task } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function UserDashboard() {
   const userId = Number(localStorage.getItem("userId"));
@@ -22,7 +23,7 @@ export default function UserDashboard() {
   const { data: myTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", { assigneeId: userId }],
     queryFn: async () => {
-      const res = await fetch(`/api/tasks?assigneeId=${userId}`);
+      const res = await apiRequest("GET", `/api/tasks?assigneeId=${userId}`);
       return res.json();
     },
     enabled: !!userId,
@@ -76,6 +77,7 @@ export default function UserDashboard() {
   const myOverdueTasks = myTasks.filter((task) =>
     isBeforeDateKey(task.dueDate, todayKey),
   );
+  console.log("myoverduetasks: ", myOverdueTasks);
   const efficiency =
     myTasks.length > 0
       ? Math.round((completedCustomers.length / myTasks.length) * 100)
@@ -204,7 +206,7 @@ export default function UserDashboard() {
                 </CardTitle>
                 {myOverdueTasks.length > 0 && (
                   <Badge className="bg-rose-500 hover:bg-rose-600 animate-pulse">
-                    {myOverdueTasks.length} Overdue
+                    {myOverdueTasks.filter(task => { task.status !== "completed" }).length} Overdue
                   </Badge>
                 )}
               </div>

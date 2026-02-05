@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { type Permission, PERMISSIONS } from "@shared/schema";
+import { getCurrentUserId } from "./auth";
 
 export function hasPermission(user: { role: string; permissions: Permission[] | null }, permission: Permission): boolean {
   if (user.role === "Admin") {
@@ -20,9 +21,10 @@ export function hasAnyPermission(user: { role: string; permissions: Permission[]
 
 export function createPermissionMiddleware(requiredPermission: Permission) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const userId = getCurrentUserId(req);
-
-    if (!userId) {
+    let userId: number;
+    try {
+      userId = getCurrentUserId(req);
+    } catch {
       return res.status(401).json({ error: "Authentication required" });
     }
 
@@ -51,9 +53,10 @@ export function createPermissionMiddleware(requiredPermission: Permission) {
 
 export function createAnyPermissionMiddleware(requiredPermissions: Permission[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const userId = getCurrentUserId(req);
-
-    if (!userId) {
+    let userId: number;
+    try {
+      userId = getCurrentUserId(req);
+    } catch {
       return res.status(401).json({ error: "Authentication required" });
     }
 
@@ -82,9 +85,10 @@ export function createAnyPermissionMiddleware(requiredPermissions: Permission[])
 
 export function requireAdmin() {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const userId = getCurrentUserId(req);
-
-    if (!userId) {
+    let userId: number;
+    try {
+      userId = getCurrentUserId(req);
+    } catch {
       return res.status(401).json({ error: "Authentication required" });
     }
 
@@ -108,15 +112,6 @@ export function requireAdmin() {
       return res.status(500).json({ error: "Internal server error" });
     }
   };
-}
-
-function getCurrentUserId(req: Request): number | null {
-  const userIdHeader = req.headers["x-user-id"];
-  if (userIdHeader) {
-    const id = parseInt(userIdHeader as string, 10);
-    return isNaN(id) ? null : id;
-  }
-  return 2;
 }
 
 export async function getUserWithPermissions(userId: number) {

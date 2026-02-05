@@ -7,14 +7,33 @@ interface EmailOptions {
 }
 
 interface TaskNotificationData {
+  taskId?: number;
   taskTitle: string;
   taskDescription?: string;
   projectName: string;
+  projectId?: number;
+  bucketName?: string;
+  bucketId?: number | null;
+  status?: string;
+  priority?: string;
   assigneeName?: string;
+  assigneeId?: number | null;
+  assignedUsers?: string[];
   assignedBy?: string;
   modifiedBy?: string;
+  completedBy?: string;
+  completionDate?: Date | null;
+  startDate?: Date | null;
   dueDate?: Date | null;
-  status?: string;
+  estimateHours?: number | null;
+  estimateMinutes?: number | null;
+  checklistCount?: number;
+  checklistCompletedCount?: number;
+  attachmentsCount?: number;
+  historyCount?: number;
+  customFields?: Record<string, string>;
+  createdAt?: Date | null;
+  position?: number | null;
   modificationType?: string;
 }
 
@@ -48,7 +67,7 @@ export async function sendEmail({
 
   try {
     const response = await resend.emails.send({
-      from: `Spectropy PMS <${resendFrom}>`,
+      from: `Spectropy CSM <${resendFrom}>`,
       to,
       subject,
       html,
@@ -78,6 +97,111 @@ function formatDate(date: Date | null | undefined): string {
   });
 }
 
+function formatDateTime(date: Date | null | undefined): string {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatStatus(status: string | null | undefined): string {
+  if (!status) return "Not set";
+  return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatPriority(priority: string | null | undefined): string {
+  if (!priority) return "Not set";
+  return priority.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatEstimate(
+  hours: number | null | undefined,
+  minutes: number | null | undefined,
+): string {
+  const safeHours = typeof hours === "number" ? hours : 0;
+  const safeMinutes = typeof minutes === "number" ? minutes : 0;
+  return `${safeHours}h ${safeMinutes}m`;
+}
+
+function formatList(values: string[] | undefined): string {
+  if (!values || values.length === 0) return "None";
+  return values.join(", ");
+}
+
+function formatChecklist(
+  completed: number | null | undefined,
+  total: number | null | undefined,
+): string {
+  if (typeof total !== "number") return "None";
+  const safeCompleted = typeof completed === "number" ? completed : 0;
+  return `${safeCompleted} of ${total} completed`;
+}
+
+function formatCustomFields(customFields: Record<string, string> | undefined): string {
+  if (!customFields || Object.keys(customFields).length === 0) return "None";
+  return Object.entries(customFields)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join("<br />");
+}
+
+function renderDetailRow(label: string, value: string, fallback?: string): string {
+  const trimmed = value?.trim();
+  const finalValue = trimmed && trimmed.length > 0 ? trimmed : fallback;
+  if (!finalValue) return "";
+  return `
+      <div class="detail-row">
+        <span class="detail-label">${label}:</span>
+        <span class="detail-value">${finalValue}</span>
+      </div>
+  `;
+}
+
+function buildBaseTaskDetails(data: TaskNotificationData): string {
+  return [
+    renderDetailRow("Task ID", data.taskId?.toString() ?? "", "Not set"),
+    renderDetailRow("Project ID", data.projectId?.toString() ?? "", "Not set"),
+    renderDetailRow("Project", data.projectName, "Not set"),
+    renderDetailRow("Bucket ID", data.bucketId?.toString() ?? "", "Not set"),
+    renderDetailRow("Stage", data.bucketName ?? "", "Not set"),
+    renderDetailRow("Status", formatStatus(data.status)),
+    renderDetailRow("Priority", formatPriority(data.priority)),
+    renderDetailRow("Position", data.position?.toString() ?? "", "Not set"),
+    renderDetailRow("Start Date", formatDate(data.startDate)),
+    renderDetailRow("Due Date", formatDate(data.dueDate)),
+    renderDetailRow(
+      "Estimate",
+      formatEstimate(data.estimateHours, data.estimateMinutes),
+    ),
+    renderDetailRow("Assignee ID", data.assigneeId?.toString() ?? "", "Unassigned"),
+    renderDetailRow("Primary Assignee", data.assigneeName ?? "", "Unassigned"),
+    renderDetailRow(
+      "Additional Assignees",
+      formatList(data.assignedUsers),
+    ),
+    renderDetailRow("Description", data.taskDescription ?? "", "Not provided"),
+    renderDetailRow(
+      "History Entries",
+      data.historyCount !== undefined ? String(data.historyCount) : "",
+      "0",
+    ),
+    renderDetailRow(
+      "Checklist",
+      formatChecklist(data.checklistCompletedCount, data.checklistCount),
+    ),
+    renderDetailRow(
+      "Attachments",
+      data.attachmentsCount !== undefined ? String(data.attachmentsCount) : "",
+      "0",
+    ),
+    renderDetailRow("Custom Fields", formatCustomFields(data.customFields)),
+    renderDetailRow("Created At", formatDateTime(data.createdAt)),
+  ].join("");
+}
+
 function getEmailTemplate(title: string, content: string): string {
   return `
     <!DOCTYPE html>
@@ -102,7 +226,7 @@ function getEmailTemplate(title: string, content: string): string {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Spectropy PMS</h1>
+          <h1>Spectropy CSM</h1>
           <p>Filling The Learning Gap</p>
         </div>
         <div class="content">
@@ -110,7 +234,7 @@ function getEmailTemplate(title: string, content: string): string {
           ${content}
         </div>
         <div class="footer">
-          <p>This is an automated notification from Spectropy PMS.</p>
+          <p>This is an automated notification from Spectropy CSM.</p>
           <p>Do not reply to this email.</p>
         </div>
       </div>
@@ -128,32 +252,15 @@ export function createTaskAssignmentEmail(
     <p>You have been assigned a new task.</p>
     <div class="task-details">
       <h3>${data.taskTitle}</h3>
-      <div class="detail-row">
-        <span class="detail-label">Project:</span>
-        <span class="detail-value">${data.projectName}</span>
-      </div>
-      ${data.taskDescription
-      ? `
-      <div class="detail-row">
-        <span class="detail-label">Description:</span>
-        <span class="detail-value">${data.taskDescription}</span>
-      </div>`
-      : ""
-    }
-      <div class="detail-row">
-        <span class="detail-label">Assigned By:</span>
-        <span class="detail-value">${data.assignedBy || "System"}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Due Date:</span>
-        <span class="detail-value">${formatDate(data.dueDate)}</span>
-      </div>
+      ${renderDetailRow("Operation", "Assigned")}
+      ${renderDetailRow("Assigned By", data.assignedBy ?? "", "System")}
+      ${buildBaseTaskDetails(data)}
     </div>
-    <p>Please log in to Spectropy PMS to view and work on this task.</p>
+    <p>Please log in to Spectropy CSM to view and work on this task.</p>
   `;
 
   return {
-    subject: `[Spectropy PMS] Task Assigned: ${data.taskTitle}`,
+    subject: `[Spectropy CSM] Task Assigned: ${data.taskTitle}`,
     html: getEmailTemplate("New Task Assignment", content),
   };
 }
@@ -161,28 +268,21 @@ export function createTaskAssignmentEmail(
 export function createTaskCompletionEmail(
   data: TaskNotificationData
 ): { subject: string; html: string } {
+  const completionDate = data.completionDate ?? new Date();
   const content = `
     <p>A task has been marked as completed.</p>
     <div class="task-details">
       <h3>${data.taskTitle}</h3>
-      <div class="detail-row">
-        <span class="detail-label">Project:</span>
-        <span class="detail-value">${data.projectName}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Completed By:</span>
-        <span class="detail-value">${data.assigneeName || "Unknown"}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Completion Date:</span>
-        <span class="detail-value">${formatDate(new Date())}</span>
-      </div>
+      ${renderDetailRow("Operation", "Completed")}
+      ${renderDetailRow("Completed By", data.completedBy ?? "", "Unknown")}
+      ${renderDetailRow("Completion Date", formatDate(completionDate))}
+      ${buildBaseTaskDetails(data)}
     </div>
-    <p>Log in to Spectropy PMS to view the completed task.</p>
+    <p>Log in to Spectropy CSM to view the completed task.</p>
   `;
 
   return {
-    subject: `[Spectropy PMS] Task Completed: ${data.taskTitle}`,
+    subject: `[Spectropy CSM] Task Completed: ${data.taskTitle}`,
     html: getEmailTemplate("Task Completed", content),
   };
 }
@@ -194,29 +294,20 @@ export function createTaskUpdateEmail(
     <p>A task you are associated with has been updated.</p>
     <div class="task-details">
       <h3>${data.taskTitle}</h3>
-      <div class="detail-row">
-        <span class="detail-label">Project:</span>
-        <span class="detail-value">${data.projectName}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Modified By:</span>
-        <span class="detail-value">${data.modifiedBy || "Unknown"}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Modification:</span>
-        <span class="detail-value">${data.modificationType || "Task details updated"
-    }</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Current Status:</span>
-        <span class="detail-value">${data.status || "Unknown"}</span>
-      </div>
+      ${renderDetailRow("Operation", "Updated")}
+      ${renderDetailRow("Modified By", data.modifiedBy ?? "", "Unknown")}
+      ${renderDetailRow(
+    "Modified Fields",
+    data.modificationType ?? "",
+    "Task details updated",
+  )}
+      ${buildBaseTaskDetails(data)}
     </div>
-    <p>Log in to Spectropy PMS to view the updated task details.</p>
+    <p>Log in to Spectropy CSM to view the updated task details.</p>
   `;
 
   return {
-    subject: `[Spectropy PMS] Task Updated: ${data.taskTitle}`,
+    subject: `[Spectropy CSM] Task Updated: ${data.taskTitle}`,
     html: getEmailTemplate("Task Updated", content),
   };
 }

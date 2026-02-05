@@ -79,12 +79,10 @@ export default function Account() {
         throw new Error("Upload failed");
       }
 
-      const downloadRes = await fetch(
+      const downloadRes = await apiRequest(
+        "GET",
         `/api/uploads/download?path=${encodeURIComponent(uploadResponse.objectPath)}`,
       );
-      if (!downloadRes.ok) {
-        throw new Error("Failed to get image URL");
-      }
 
       const { downloadURL } = await downloadRes.json();
       setAvatar(downloadURL);
